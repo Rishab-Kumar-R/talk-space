@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+jwt:
+  secret: "m8yg3d6Y2OKUA0brDWQbs8nPUZLp/WN9BtKc+E24mlw="
+  expiration: 86400000
+
+spring:
+  application:
+    name: server
+  mongodb:
+    host: localhost
+    port: 27017
+    database: chat_db
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
+  main:
+    banner-mode: "off"
+
+encryption:
+  key: "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ=="
