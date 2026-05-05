@@ -29,6 +29,27 @@ services:
     build:
       context: ./apps/server
       dockerfile: Dockerfile
+    image: talkspace-server   # named so server2 can reuse it without rebuilding
+    restart: unless-stopped
+    expose:
+      - "8080"
+    env_file:
+      - ./apps/server/.env
+    environment:
+      MONGODB_HOST: mongo
+      REDIS_HOST: redis
+      ALLOWED_ORIGIN: http://localhost
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Second instance — reuses the same image, same config, different container.
+  # Nginx distributes connections across both with least_conn. Redis pub/sub
+  # ensures a message sent to server1 reaches clients on server2 and vice versa.
+  server2:
+    image: talkspace-server
     restart: unless-stopped
     expose:
       - "8080"
@@ -66,6 +87,7 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - server
+      - server2
       - web
 
 volumes:
