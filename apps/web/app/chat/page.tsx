@@ -103,10 +103,9 @@ export default function ChatPage() {
   const roomMembers = useRoomMembers(activeRoom, username);
 
   // Auth bootstrap — redirect if no token, then load profile
-  // TEMP: commented out for UI preview — uncomment before deploying
   useEffect(() => {
-    // if (!localStorage.getItem("token")) { router.push("/login"); return; }
-    // profile.loadProfile();
+    if (!localStorage.getItem("token")) { router.push("/login"); return; }
+    profile.loadProfile();
   }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notify on new incoming messages

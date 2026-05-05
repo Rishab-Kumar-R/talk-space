@@ -15,7 +15,9 @@ public class User {
     @Indexed(unique = true)
     private String username;
 
-    private String password;
+    private String password;       // null for OAuth users
+    private String provider;       // "google" | "github" | null for legacy accounts
+    private String providerId;     // provider's user ID
     private String displayName;
     private String avatarColor;
     private boolean showReadReceipts = true;
@@ -35,6 +37,10 @@ public class User {
     public void setUsername(String username) { this.username = username; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getProviderId() { return providerId; }
+    public void setProviderId(String providerId) { this.providerId = providerId; }
     public String getDisplayName() { return displayName; }
     public void setDisplayName(String displayName) { this.displayName = displayName; }
     public String getAvatarColor() { return avatarColor; }

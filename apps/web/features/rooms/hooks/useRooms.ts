@@ -13,14 +13,13 @@ export function useRooms() {
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  // TEMP: commented out for UI preview — uncomment before deploying
-  // useEffect(() => {
-  //   getRooms().then((r) => {
-  //     setRooms(r);
-  //     if (r.length > 0) setActiveRoom(r[0]);
-  //   });
-  //   getUnreadCounts().then(setUnreadCounts);
-  // }, []);
+  useEffect(() => {
+    getRooms().then((r) => {
+      setRooms(r);
+      if (r.length > 0) setActiveRoom(r[0]);
+    });
+    getUnreadCounts().then(setUnreadCounts);
+  }, []);
 
   const selectRoom = useCallback((room: Room) => {
     setActiveRoom(room);

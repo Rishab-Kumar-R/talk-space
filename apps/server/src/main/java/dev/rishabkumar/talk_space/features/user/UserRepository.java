@@ -7,6 +7,7 @@ import reactor.core.publisher.Mono;
 
 public interface UserRepository extends ReactiveMongoRepository<User, String> {
     Mono<User> findByUsername(String username);
+    Mono<User> findByProviderAndProviderId(String provider, String providerId);
     Flux<User> findByUsernameContainingIgnoreCaseAndUsernameNot(
             String query, String excludeUsername, Pageable pageable);
 }

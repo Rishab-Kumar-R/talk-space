@@ -1,5 +1,6 @@
 package dev.rishabkumar.talk_space.shared.security;
 
+import dev.rishabkumar.talk_space.features.auth.OAuthSuccessHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,8 +12,6 @@ import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
@@ -28,12 +27,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtService jwtService;
+    private final OAuthSuccessHandler oAuthSuccessHandler;
 
     @Value("${cors.allowed-origin}")
     private String allowedOrigin;
 
-    public SecurityConfig(JwtService jwtService) {
+    public SecurityConfig(JwtService jwtService, OAuthSuccessHandler oAuthSuccessHandler) {
         this.jwtService = jwtService;
+        this.oAuthSuccessHandler = oAuthSuccessHandler;
     }
 
     @Bean
@@ -43,7 +44,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers("/api/auth/**").permitAll()
+                        .pathMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .pathMatchers("/ws/**").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/rooms", "/api/rooms/*/presence").permitAll()
                         .pathMatchers("/api/messages/*/reactions").authenticated()
@@ -53,6 +54,7 @@ public class SecurityConfig {
                         .anyExchange().authenticated()
                 )
                 .addFilterAt(jwtWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                .oauth2Login(oauth -> oauth.authenticationSuccessHandler(oAuthSuccessHandler))
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .build();
@@ -88,8 +90,4 @@ public class SecurityConfig {
         };
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 }
