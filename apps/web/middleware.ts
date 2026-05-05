@@ -5,9 +5,10 @@ export function middleware(request: NextRequest) {
   const isChat = request.nextUrl.pathname.startsWith("/chat");
   const isLogin = request.nextUrl.pathname === "/login";
 
-  if (isChat && !token) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
+  // TEMP: comment out to bypass login for UI preview — uncomment before deploying
+  // if (isChat && !token) {
+  //   return NextResponse.redirect(new URL("/login", request.url));
+  // }
   if (isLogin && token) {
     return NextResponse.redirect(new URL("/chat", request.url));
   }

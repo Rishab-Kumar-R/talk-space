@@ -1,0 +1,66 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { getRooms, createRoom, markRoomRead, getUnreadCounts } from "../api";
+import { Room } from "../../../shared/types";
+
+export function useRooms() {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [newRoomName, setNewRoomName] = useState("");
+  const [newRoomPrivate, setNewRoomPrivate] = useState(false);
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  // TEMP: commented out for UI preview — uncomment before deploying
+  // useEffect(() => {
+  //   getRooms().then((r) => {
+  //     setRooms(r);
+  //     if (r.length > 0) setActiveRoom(r[0]);
+  //   });
+  //   getUnreadCounts().then(setUnreadCounts);
+  // }, []);
+
+  const selectRoom = useCallback((room: Room) => {
+    setActiveRoom(room);
+    setUnreadCounts((prev) => ({ ...prev, [room.name]: 0 }));
+    markRoomRead(room.name);
+  }, []);
+
+  const handleCreateRoom = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoomName.trim()) return;
+    setCreateError("");
+    try {
+      const room = await createRoom(newRoomName.trim(), newRoomPrivate);
+      setRooms((prev) => [...prev, room]);
+      setNewRoomName("");
+      setNewRoomPrivate(false);
+      setShowCreateRoom(false);
+      selectRoom(room);
+    } catch {
+      setCreateError("Room already exists");
+    }
+  }, [newRoomName, newRoomPrivate, selectRoom]);
+
+  const removeRoom = useCallback((roomId: string) => {
+    setRooms((prev) => prev.filter((r) => r.id !== roomId));
+  }, []);
+
+  const updateRoom = useCallback((updated: Room) => {
+    setRooms((prev) => prev.map((r) => r.id === updated.id ? updated : r));
+  }, []);
+
+  return {
+    rooms, setRooms,
+    activeRoom, setActiveRoom, selectRoom,
+    unreadCounts, setUnreadCounts,
+    newRoomName, setNewRoomName,
+    newRoomPrivate, setNewRoomPrivate,
+    showCreateRoom, setShowCreateRoom,
+    createError, setCreateError,
+    handleCreateRoom,
+    removeRoom, updateRoom,
+  };
+}

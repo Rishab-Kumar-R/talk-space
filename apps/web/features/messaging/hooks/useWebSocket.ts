@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Message } from "./api";
+import { Message } from "../../../shared/types";
+
+export type WsEvent =
+  | { type: "message_edited"; id: string; content: string; editedAt: string }
+  | { type: "message_deleted"; id: string };
 
 export function useWebSocket(roomId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [wsEvents, setWsEvents] = useState<WsEvent[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -15,6 +20,7 @@ export function useWebSocket(roomId: string) {
     destroyed.current = false;
     retryCount.current = 0;
     setMessages([]);
+    setWsEvents([]);
     setTypingUsers([]);
 
     const token = localStorage.getItem("token");
@@ -23,9 +29,9 @@ export function useWebSocket(roomId: string) {
     function connect() {
       if (destroyed.current) return;
 
-      const ws = new WebSocket(
-        `ws://localhost:8080/ws/chat/${roomId}?token=${token}`,
-      );
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+      const wsBase = apiBase.replace(/^http/, "ws");
+      const ws = new WebSocket(`${wsBase}/ws/chat/${roomId}?token=${token}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -51,6 +57,8 @@ export function useWebSocket(roomId: string) {
         } else if (data.type === "message") {
           const { type: _type, ...message } = data;
           setMessages((prev) => [...prev, message as Message]);
+        } else if (data.type === "message_edited" || data.type === "message_deleted") {
+          setWsEvents((prev) => [...prev, data as WsEvent]);
         }
       };
 
@@ -75,10 +83,15 @@ export function useWebSocket(roomId: string) {
   }, [roomId]);
 
   const sendMessage = useCallback(
-    (content: string, replyToId?: string, replyPreview?: string) => {
+    (
+      content: string,
+      replyToId?: string,
+      replyPreview?: string,
+      filePayload?: { fileUrl: string; fileName: string; fileSize: number; mimeType: string; messageType: "image" | "file" },
+    ) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
-          JSON.stringify({ type: "message", content, replyToId, replyPreview }),
+          JSON.stringify({ type: "message", content, replyToId, replyPreview, ...filePayload }),
         );
       }
     },
@@ -91,5 +104,5 @@ export function useWebSocket(roomId: string) {
     }
   }, []);
 
-  return { messages, typingUsers, connected, sendMessage, sendTyping };
+  return { messages, wsEvents, typingUsers, connected, sendMessage, sendTyping };
 }

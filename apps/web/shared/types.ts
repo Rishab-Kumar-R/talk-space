@@ -1,0 +1,68 @@
+// Central type definitions shared across all features
+
+export type UserStatus = "available" | "away" | "dnd";
+
+export interface Message {
+  id: string;
+  roomId: string;
+  senderId: string;
+  senderUsername: string;
+  content: string;
+  timestamp: string;
+  replyToId?: string;
+  replyPreview?: string;
+  reactions?: Record<string, string[]>;
+  editedAt?: string;
+  deleted?: boolean;
+  messageType?: "text" | "image" | "file";
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+  pinnedMessageIds?: string[];
+  isPrivate?: boolean;
+  memberRoles?: Record<string, string>;
+}
+
+export interface UserSummary {
+  id: string;
+  username: string;
+  status: UserStatus;
+  statusText: string;
+}
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarColor: string | null;
+  showReadReceipts: boolean;
+  status: UserStatus;
+  statusText: string;
+}
+
+export interface ReadReceipt {
+  username: string;
+  readAt: string;
+}
+
+export interface UploadResult {
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  messageType: "image" | "file";
+}
+
+export interface ReplyTo {
+  id: string;
+  username: string;
+  preview: string;
+}
