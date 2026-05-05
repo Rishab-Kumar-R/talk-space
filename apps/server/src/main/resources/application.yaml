@@ -1,21 +1,23 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 jwt:
-  secret: "m8yg3d6Y2OKUA0brDWQbs8nPUZLp/WN9BtKc+E24mlw="
-  expiration: 86400000
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
 
 spring:
   application:
     name: server
+  codec:
+    max-in-memory-size: 20MB
   mongodb:
-    host: localhost
-    port: 27017
-    database: chat_db
+    host: ${MONGODB_HOST:localhost}
+    port: ${MONGODB_PORT:27017}
+    database: ${MONGODB_DATABASE:chat_db}
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
@@ -23,4 +25,27 @@ spring:
     banner-mode: "off"
 
 encryption:
-  key: "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ=="
+  key: ${ENCRYPTION_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+cors:
+  allowed-origin: ${ALLOWED_ORIGIN:http://localhost:3000}
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  access-key: ${AWS_ACCESS_KEY_ID}
+  secret-key: ${AWS_SECRET_ACCESS_KEY}
+  s3:
+    bucket: ${AWS_S3_BUCKET}
+    max-file-size-mb: ${AWS_S3_MAX_FILE_SIZE_MB:10}

@@ -1,0 +1,109 @@
+# Observability stack — run alongside the main docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up
+#
+# Or standalone (assumes server + infra are already running separately):
+#
+#   docker compose -f docker-compose.observability.yml up
+#
+# Ports exposed on localhost:
+#   Grafana      → http://localhost:3001  (admin / admin)
+#   Prometheus   → http://localhost:9090
+#   Loki         → http://localhost:3100
+#   Tempo        → http://localhost:3200
+#   OTel gRPC    → localhost:4317
+#   OTel HTTP    → localhost:4318
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.0
+    restart: unless-stopped
+    command: ["--config=/etc/otel/otel-collector.yml"]
+    volumes:
+      - ./otel/otel-collector.yml:/etc/otel/otel-collector.yml:ro
+    ports:
+      - "4317:4317"   # gRPC receiver
+      - "4318:4318"   # HTTP receiver
+      - "8888:8888"   # OTel Collector self-telemetry (Prometheus scrapes this)
+    depends_on:
+      - prometheus
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-remote-write-receiver"   # lets OTel collector push metrics
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:3.3.2
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200"   # HTTP API (Grafana queries here)
+      # 4317/4318 are also exposed inside the tempo container for OTLP ingestion
+      # but the otel-collector sends to tempo:4317 on the Docker network
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+      GF_SERVER_HTTP_PORT: "3001"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3001"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  # Override the server service from docker-compose.yml to inject OTel env vars
+  # (this only applies when both compose files are used together)
+  server:
+    environment:
+      OTEL_SERVICE_NAME: talkspace-server
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none        # Prometheus scrapes /actuator/prometheus directly
+      OTEL_LOGS_EXPORTER: none           # Logback → Loki directly via loki-logback-appender
+      OTEL_PROPAGATORS: tracecontext,baggage
+      LOKI_URL: http://loki:3100
+
+volumes:
+  prometheus_data:
+  loki_data:
+  tempo_data:
+  grafana_data:

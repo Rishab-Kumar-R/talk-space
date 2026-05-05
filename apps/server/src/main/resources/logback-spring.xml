@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- Console appender — always active -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Loki appender — active when LOKI_URL is set (i.e. inside Docker) -->
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${LOKI_URL:-http://localhost:3100}/loki/api/v1/push</url>
+            <connectionTimeoutMs>5000</connectionTimeoutMs>
+            <requestTimeoutMs>5000</requestTimeoutMs>
+        </http>
+        <format>
+            <label>
+                <pattern>app=talkspace-server,host=${HOSTNAME:-local},level=%level,logger=%logger{20}</pattern>
+                <readMarkers>true</readMarkers>
+            </label>
+            <message class="com.github.loki4j.logback.JsonLayout"/>
+            <sortByTime>true</sortByTime>
+        </format>
+        <metrics>
+            <enabled>true</enabled>
+        </metrics>
+    </appender>
+
+    <!-- Only send to Loki when running inside Docker (LOKI_URL env var must be set) -->
+    <if condition='isDefined("LOKI_URL")'>
+        <then>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+                <appender-ref ref="LOKI"/>
+            </root>
+        </then>
+        <else>
+            <root level="INFO">
+                <appender-ref ref="CONSOLE"/>
+            </root>
+        </else>
+    </if>
+
+    <!-- Silence noisy framework loggers -->
+    <logger name="org.springframework.data.mongodb" level="WARN"/>
+    <logger name="org.springframework.data.redis" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+</configuration>

@@ -1,0 +1,99 @@
+{
+  "id": null,
+  "uid": "talkspace-chat",
+  "title": "TalkSpace — Chat Activity",
+  "description": "Messages, uploads, Redis publish latency, and encryption timing",
+  "schemaVersion": 38,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "tags": ["talkspace"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Messages Sent per Minute",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "displayName": "msg/min" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(talkspace_messages_sent_total[5m]) * 60",
+          "legendFormat": "messages / min"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "S3 Upload Throughput",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "Bps" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(talkspace_upload_bytes_total[5m])",
+          "legendFormat": "bytes/s"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Redis Publish Latency — P50 / P95",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "talkspace_redis_publish_duration_seconds{quantile=\"0.5\"} * 1000",
+          "legendFormat": "P50"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "talkspace_redis_publish_duration_seconds{quantile=\"0.95\"} * 1000",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "AES-256-GCM Encryption Latency — P50 / P95",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "µs" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "talkspace_messages_encrypted_duration_seconds{quantile=\"0.5\"} * 1e6",
+          "legendFormat": "P50"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "talkspace_messages_encrypted_duration_seconds{quantile=\"0.95\"} * 1e6",
+          "legendFormat": "P95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Application Logs",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "showTime": true, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{app=\"talkspace-server\"}",
+          "legendFormat": ""
+        }
+      ]
+    }
+  ]
+}
