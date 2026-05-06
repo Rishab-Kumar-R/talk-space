@@ -10,12 +10,11 @@ interface Props {
   rootMessage: Message;
   threadMessages: Message[];
   loading: boolean;
-  username: string;
   onClose: () => void;
   onSendReply: (content: string, threadId: string) => void;
 }
 
-export function ThreadPanel({ rootMessage, threadMessages, loading, username, onClose, onSendReply }: Props) {
+export function ThreadPanel({ rootMessage, threadMessages, loading, onClose, onSendReply }: Props) {
   const [reply, setReply] = useState("");
 
   function handleSubmit(e: React.FormEvent) {

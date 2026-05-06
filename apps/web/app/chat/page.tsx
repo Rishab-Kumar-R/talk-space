@@ -405,7 +405,6 @@ export default function ChatPage() {
           rootMessage={thread.rootMessage}
           threadMessages={thread.threadMessages}
           loading={thread.loading}
-          username={username}
           onClose={thread.closeThread}
           onSendReply={handleSendThreadReply}
         />

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -14,7 +14,6 @@ export default function AuthCallbackPage() {
       return;
     }
     localStorage.setItem("token", token);
-    // Set cookie so middleware can read it server-side
     document.cookie = `token=${token}; path=/; SameSite=Lax`;
     router.replace("/chat");
   }, [params, router]);
@@ -23,5 +22,13 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen bg-warm-200 flex items-center justify-center">
       <p className="text-warm-600 text-sm">Signing you in…</p>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense>
+      <AuthCallbackInner />
+    </Suspense>
   );
 }

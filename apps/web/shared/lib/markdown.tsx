@@ -16,7 +16,7 @@ function highlightMentions(text: string): string {
   );
 }
 
-export function MarkdownContent({ content, currentUser }: { content: string; currentUser?: string }) {
+export function MarkdownContent({ content }: { content: string }) {
   const html = useMemo(() => {
     const withMentions = highlightMentions(content);
     const raw = marked.parse(withMentions, { renderer }) as string;

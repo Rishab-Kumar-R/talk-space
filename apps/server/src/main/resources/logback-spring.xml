@@ -29,20 +29,18 @@
         </metrics>
     </appender>
 
-    <!-- Only send to Loki when running inside Docker (LOKI_URL env var must be set) -->
-    <if condition='isDefined("LOKI_URL")'>
-        <then>
-            <root level="INFO">
-                <appender-ref ref="CONSOLE"/>
-                <appender-ref ref="LOKI"/>
-            </root>
-        </then>
-        <else>
-            <root level="INFO">
-                <appender-ref ref="CONSOLE"/>
-            </root>
-        </else>
-    </if>
+    <springProfile name="docker">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="LOKI"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!docker">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
 
     <!-- Silence noisy framework loggers -->
     <logger name="org.springframework.data.mongodb" level="WARN"/>
