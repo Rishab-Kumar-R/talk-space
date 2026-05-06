@@ -19,14 +19,13 @@ spring:
     name: server
   codec:
     max-in-memory-size: 20MB
-  mongodb:
-    host: ${MONGODB_HOST:localhost}
-    port: ${MONGODB_PORT:27017}
-    database: ${MONGODB_DATABASE:chat_db}
   data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/chat_db}
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   security:
     oauth2:
       client:
