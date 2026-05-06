@@ -31,7 +31,7 @@ export function useWebSocket(roomId: string) {
     function connect() {
       if (destroyed.current) return;
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? window.location.origin;
       const wsBase = apiBase.replace(/^http/, "ws");
       const ws = new WebSocket(`${wsBase}/ws/chat/${roomId}?token=${token}`);
       wsRef.current = ws;
