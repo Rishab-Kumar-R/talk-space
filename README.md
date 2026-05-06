@@ -1,5 +1,9 @@
 # TalkSpace
 
+![CI](https://github.com/Rishab-Kumar-R/talk-space/actions/workflows/ci.yml/badge.svg)
+![Docker](https://github.com/Rishab-Kumar-R/talk-space/actions/workflows/docker.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 A scalable, real-time chat application with end-to-end message encryption, OAuth login, message threads, @ mentions, file uploads, and horizontal scaling via Redis pub/sub.
 
 ## Architecture
@@ -253,14 +257,14 @@ This starts MongoDB, Redis, the Spring Boot server, and the Next.js frontend tog
 
 ## CI / CD
 
-Two GitHub Actions workflows run automatically — **no secrets to configure**.
+Two GitHub Actions workflows run on every push.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `ci.yml` | Every push, PRs to `main` | Compiles the Spring Boot backend, runs tests, then type-checks + lints + builds the Next.js frontend |
-| `docker.yml` | Push to `main` | Builds multi-platform Docker images for server + web and pushes them to GitHub Container Registry (`ghcr.io`) |
+| `docker.yml` | Push to `main` | Builds multi-platform Docker images for server + web and pushes them to Docker Hub |
 
-The Docker workflow pushes to Docker Hub using two repository secrets you add once (Settings → Secrets → Actions):
+The Docker workflow requires two repository secrets (Settings → Secrets → Actions):
 
 | Secret | Value |
 |---|---|
