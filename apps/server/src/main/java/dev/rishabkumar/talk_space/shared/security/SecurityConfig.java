@@ -47,7 +47,7 @@ public class SecurityConfig {
                         .pathMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .pathMatchers("/api/auth/refresh", "/api/auth/logout").permitAll()
                         .pathMatchers("/ws/**").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/api/rooms", "/api/rooms/*/presence").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/rooms", "/api/rooms/public", "/api/rooms/*/presence").permitAll()
                         .pathMatchers("/api/messages/*/reactions").authenticated()
                         .pathMatchers("/api/upload").authenticated()
                         .pathMatchers("/api/rooms/**").authenticated()

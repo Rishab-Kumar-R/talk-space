@@ -2,6 +2,7 @@ package dev.rishabkumar.talk_space.features.room;
 
 import dev.rishabkumar.talk_space.features.messaging.Message;
 import dev.rishabkumar.talk_space.features.messaging.MessageRepository;
+import dev.rishabkumar.talk_space.features.presence.PresenceService;
 import dev.rishabkumar.talk_space.shared.security.EncryptionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final MessageRepository messageRepository;
     private final EncryptionService encryptionService;
+    private final PresenceService presenceService;
 
     @Value("${rate-limit.private-rooms-per-month:2}")
     private int privateRoomsPerMonth;
@@ -35,15 +37,42 @@ public class RoomService {
 
     public RoomService(RoomRepository roomRepository,
                        MessageRepository messageRepository,
-                       EncryptionService encryptionService) {
+                       EncryptionService encryptionService,
+                       PresenceService presenceService) {
         this.roomRepository = roomRepository;
         this.messageRepository = messageRepository;
         this.encryptionService = encryptionService;
+        this.presenceService = presenceService;
     }
 
     public Flux<Room> listAccessible(String username) {
         return roomRepository.findAll()
                 .filter(room -> !room.isPrivate() || room.getMemberRoles().containsKey(username));
+    }
+
+    public Flux<PublicRoomSummary> listPublic() {
+        return roomRepository.findAll()
+                .filter(room -> !room.isPrivate())
+                .flatMap(room -> {
+                    Mono<Long> onlineCount = presenceService.getOnline(room.getName()).count();
+                    Mono<String[]> lastMsgData = messageRepository
+                            .findFirstByRoomIdOrderByTimestampDesc(room.getName())
+                            .map(msg -> new String[]{
+                                    truncate(msg.getContent() != null
+                                            ? encryptionService.decrypt(msg.getContent()) : null, 80),
+                                    msg.getTimestamp().toString()
+                            })
+                            .defaultIfEmpty(new String[]{null, null});
+                    return Mono.zip(onlineCount, lastMsgData)
+                            .map(t -> new PublicRoomSummary(
+                                    room.getName(), room.getCreatedBy(), room.getCreatedAt().toString(),
+                                    t.getT1(), t.getT2()[0], t.getT2()[1]));
+                });
+    }
+
+    private String truncate(String text, int max) {
+        if (text == null) return null;
+        return text.length() <= max ? text : text.substring(0, max) + "…";
     }
 
     public Mono<Room> create(String name, boolean isPrivate, String createdBy) {

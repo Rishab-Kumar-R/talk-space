@@ -21,6 +21,11 @@ public class RoomController {
         this.presenceService = presenceService;
     }
 
+    @GetMapping("/public")
+    public Flux<PublicRoomSummary> listPublicRooms() {
+        return roomService.listPublic();
+    }
+
     @GetMapping
     public Flux<Room> listRooms() {
         return ReactiveSecurityContextHolder.getContext()

@@ -32,6 +32,15 @@ export default function LoginPage() {
         <p className="text-warm-500 text-xs text-center mt-8">
           By signing in you agree to use this app responsibly.
         </p>
+
+        <p className="text-center mt-4">
+          <a
+            href="/browse"
+            className="text-warm-500 text-xs hover:text-warm-700 transition-colors"
+          >
+            Browse public rooms without signing in →
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -1,5 +1,11 @@
 import { API_BASE, apiFetch } from "../../shared/lib/api-client";
-import { Room } from "../../shared/types";
+import { PublicRoomSummary, Room } from "../../shared/types";
+
+export async function getPublicRooms(): Promise<PublicRoomSummary[]> {
+  const res = await fetch(`${API_BASE}/rooms/public`);
+  if (!res.ok) return [];
+  return res.json();
+}
 
 export async function getRooms(): Promise<Room[]> {
   const res = await apiFetch(`${API_BASE}/rooms`);

@@ -61,6 +61,15 @@ export interface UploadResult {
   messageType: "image" | "file";
 }
 
+export interface PublicRoomSummary {
+  name: string;
+  createdBy: string;
+  createdAt: string;
+  onlineCount: number;
+  lastMessagePreview: string | null;
+  lastMessageAt: string | null;
+}
+
 export interface ReplyTo {
   id: string;
   username: string;
