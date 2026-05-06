@@ -3,12 +3,16 @@ package dev.rishabkumar.talk_space.features.room;
 import dev.rishabkumar.talk_space.features.messaging.Message;
 import dev.rishabkumar.talk_space.features.messaging.MessageRepository;
 import dev.rishabkumar.talk_space.shared.security.EncryptionService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +26,12 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final MessageRepository messageRepository;
     private final EncryptionService encryptionService;
+
+    @Value("${rate-limit.private-rooms-per-month:2}")
+    private int privateRoomsPerMonth;
+
+    @Value("${rate-limit.public-rooms-per-month:5}")
+    private int publicRoomsPerMonth;
 
     public RoomService(RoomRepository roomRepository,
                        MessageRepository messageRepository,
@@ -45,7 +55,8 @@ public class RoomService {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Name may only contain letters, numbers, dots, hyphens, underscores"));
 
-        return roomRepository.existsByName(name)
+        return checkMonthlyRoomLimit(createdBy, isPrivate)
+                .then(roomRepository.existsByName(name))
                 .flatMap(exists -> {
                     if (exists) return Mono.error(
                             new ResponseStatusException(HttpStatus.CONFLICT, "Room already exists"));
@@ -121,6 +132,20 @@ public class RoomService {
                     room.setPinnedMessageIds(pins);
                     return roomRepository.save(room);
                 });
+    }
+
+    private Mono<Void> checkMonthlyRoomLimit(String username, boolean isPrivate) {
+        YearMonth current = YearMonth.now(ZoneOffset.UTC);
+        Instant start = current.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant end = current.atEndOfMonth().atTime(23, 59, 59).toInstant(ZoneOffset.UTC);
+        int limit = isPrivate ? privateRoomsPerMonth : publicRoomsPerMonth;
+        String type = isPrivate ? "private" : "public";
+
+        return roomRepository.countByCreatedByAndIsPrivateAndCreatedAtBetween(username, isPrivate, start, end)
+                .flatMap(count -> count >= limit
+                        ? Mono.error(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                                "Monthly limit of " + limit + " " + type + " rooms reached"))
+                        : Mono.empty());
     }
 
     public Flux<Message> getPinned(String roomId) {

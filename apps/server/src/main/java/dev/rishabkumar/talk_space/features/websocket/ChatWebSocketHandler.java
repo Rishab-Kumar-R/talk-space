@@ -6,8 +6,10 @@ import dev.rishabkumar.talk_space.features.messaging.MessageService;
 import dev.rishabkumar.talk_space.features.presence.PresenceService;
 import dev.rishabkumar.talk_space.features.room.RoomRepository;
 import dev.rishabkumar.talk_space.shared.metrics.AppMetrics;
+import dev.rishabkumar.talk_space.shared.ratelimit.RateLimitService;
 import dev.rishabkumar.talk_space.shared.security.JwtService;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.ReactiveSubscription;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
@@ -17,6 +19,7 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -36,6 +39,13 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;
     private final AppMetrics metrics;
+    private final RateLimitService rateLimitService;
+
+    @Value("${rate-limit.ws-messages-per-minute:30}")
+    private int wsMsgLimit;
+
+    @Value("${rate-limit.ws-joins-per-minute:10}")
+    private int wsJoinLimit;
 
     public ChatWebSocketHandler(
             @Qualifier("reactiveStringRedisTemplate") ReactiveRedisTemplate<String, String> redisTemplate,
@@ -46,7 +56,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             PresenceService presenceService,
             JwtService jwtService,
             ObjectMapper objectMapper,
-            AppMetrics metrics) {
+            AppMetrics metrics,
+            RateLimitService rateLimitService) {
         this.redisTemplate = redisTemplate;
         this.listenerContainer = listenerContainer;
         this.roomRepository = roomRepository;
@@ -56,6 +67,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         this.jwtService = jwtService;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
+        this.rateLimitService = rateLimitService;
     }
 
     @Override
@@ -68,19 +80,26 @@ public class ChatWebSocketHandler implements WebSocketHandler {
 
         String username = jwtService.extractUsername(token);
 
-        // For private rooms, reject non-members immediately
-        Mono<Boolean> membershipCheck = roomRepository.findByName(roomId)
-                .map(room -> !room.isPrivate() || room.getMemberRoles().containsKey(username))
-                .defaultIfEmpty(true);
+        // Reject if this user is joining rooms too rapidly
+        return rateLimitService.isAllowed("ratelimit:ws:join:" + username, wsJoinLimit, 60)
+                .flatMap(joinAllowed -> {
+                    if (!joinAllowed) return session.close();
 
-        return membershipCheck.flatMap(allowed -> {
-            if (!allowed) return session.close();
-            return doHandle(session, roomId, username);
-        });
+                    // For private rooms, reject non-members immediately
+                    Mono<Boolean> membershipCheck = roomRepository.findByName(roomId)
+                            .map(room -> !room.isPrivate() || room.getMemberRoles().containsKey(username))
+                            .defaultIfEmpty(true);
+
+                    return membershipCheck.flatMap(allowed -> {
+                        if (!allowed) return session.close();
+                        return doHandle(session, roomId, username);
+                    });
+                });
     }
 
     private Mono<Void> doHandle(WebSocketSession session, String roomId, String username) {
         String channel = "chat.room." + roomId;
+        Sinks.Many<String> serverPush = Sinks.many().unicast().onBackpressureBuffer();
 
         Mono<Void> inbound = session.receive()
                 .flatMap(wsMessage -> {
@@ -98,7 +117,14 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                             return broadcastService.publish(roomId, Map.copyOf(typingEvent));
                         }
 
-                        return saveAndBroadcast(event, roomId, username, channel);
+                        return rateLimitService.isAllowed("ratelimit:ws:msg:" + username, wsMsgLimit, 60)
+                                .flatMap(allowed -> {
+                                    if (!allowed) {
+                                        serverPush.tryEmitNext("{\"type\":\"rate_limited\",\"retryAfter\":60}");
+                                        return Mono.empty();
+                                    }
+                                    return saveAndBroadcast(event, roomId, username, channel);
+                                });
                     } catch (JacksonException e) {
                         return Mono.error(e);
                     }
@@ -109,7 +135,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .receive(ChannelTopic.of(channel))
                 .map(ReactiveSubscription.Message::getMessage);
 
-        Mono<Void> outbound = session.send(redisMessages.map(session::textMessage));
+        Mono<Void> outbound = session.send(
+                Flux.merge(redisMessages, serverPush.asFlux()).map(session::textMessage));
 
         metrics.wsConnections.incrementAndGet();
         return presenceService.join(roomId, username)
@@ -117,6 +144,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .then()
                 .doFinally(signal -> {
                     metrics.wsConnections.decrementAndGet();
+                    serverPush.tryEmitComplete();
                     presenceService.leave(roomId, username).subscribe();
                 });
     }

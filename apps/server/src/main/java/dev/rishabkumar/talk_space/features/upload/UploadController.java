@@ -1,12 +1,16 @@
 package dev.rishabkumar.talk_space.features.upload;
 
+import dev.rishabkumar.talk_space.shared.ratelimit.RateLimitService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,15 +26,37 @@ public class UploadController {
     );
 
     private final S3Service s3Service;
+    private final RateLimitService rateLimitService;
     private final long maxBytes;
+    private final int uploadsPerDay;
 
-    public UploadController(S3Service s3Service, @Value("${aws.s3.max-file-size-mb}") int maxFileSizeMb) {
+    public UploadController(S3Service s3Service,
+                             RateLimitService rateLimitService,
+                             @Value("${aws.s3.max-file-size-mb}") int maxFileSizeMb,
+                             @Value("${rate-limit.uploads-per-day:20}") int uploadsPerDay) {
         this.s3Service = s3Service;
+        this.rateLimitService = rateLimitService;
         this.maxBytes = (long) maxFileSizeMb * 1024 * 1024;
+        this.uploadsPerDay = uploadsPerDay;
     }
 
     @PostMapping
     public Mono<Map<String, Object>> upload(@RequestPart("file") FilePart filePart) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(username -> {
+                    String today = LocalDate.now(ZoneOffset.UTC).toString();
+                    return rateLimitService.isAllowed("ratelimit:upload:" + username + ":" + today, uploadsPerDay, 86400L)
+                            .flatMap(allowed -> {
+                                if (!allowed) return Mono.error(new ResponseStatusException(
+                                        HttpStatus.TOO_MANY_REQUESTS,
+                                        "Daily upload limit (" + uploadsPerDay + ") reached"));
+                                return doUpload(filePart);
+                            });
+                });
+    }
+
+    private Mono<Map<String, Object>> doUpload(FilePart filePart) {
         String contentType = filePart.headers().getContentType() != null
                 ? filePart.headers().getContentType().toString()
                 : "application/octet-stream";
