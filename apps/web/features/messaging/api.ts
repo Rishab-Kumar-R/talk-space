@@ -1,10 +1,10 @@
-import { API_BASE, authHeaders } from "../../shared/lib/api-client";
+import { API_BASE, apiFetch } from "../../shared/lib/api-client";
 import { Message } from "../../shared/types";
 
 export async function getMessages(roomId: string, before?: string): Promise<Message[]> {
   const url = new URL(`${API_BASE}/rooms/${roomId}/messages`);
   if (before) url.searchParams.set("before", before);
-  const res = await fetch(url.toString(), { headers: authHeaders() });
+  const res = await apiFetch(url.toString());
   if (!res.ok) return [];
   return res.json();
 }
@@ -12,15 +12,15 @@ export async function getMessages(roomId: string, before?: string): Promise<Mess
 export async function searchMessages(roomId: string, q: string): Promise<Message[]> {
   const url = new URL(`${API_BASE}/rooms/${roomId}/messages/search`);
   url.searchParams.set("q", q);
-  const res = await fetch(url.toString(), { headers: authHeaders() });
+  const res = await apiFetch(url.toString());
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function toggleReaction(messageId: string, emoji: string): Promise<Message> {
-  const res = await fetch(`${API_BASE}/messages/${messageId}/reactions`, {
+  const res = await apiFetch(`${API_BASE}/messages/${messageId}/reactions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ emoji }),
   });
   if (!res.ok) throw new Error("Failed to toggle reaction");
@@ -28,9 +28,9 @@ export async function toggleReaction(messageId: string, emoji: string): Promise<
 }
 
 export async function editMessage(messageId: string, content: string): Promise<Message> {
-  const res = await fetch(`${API_BASE}/messages/${messageId}`, {
+  const res = await apiFetch(`${API_BASE}/messages/${messageId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
   });
   if (!res.ok) throw new Error("Failed to edit message");
@@ -38,9 +38,6 @@ export async function editMessage(messageId: string, content: string): Promise<M
 }
 
 export async function deleteMessage(messageId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/messages/${messageId}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
+  const res = await apiFetch(`${API_BASE}/messages/${messageId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete message");
 }

@@ -5,6 +5,7 @@ import dev.rishabkumar.talk_space.features.user.UserRepository;
 import dev.rishabkumar.talk_space.shared.security.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -16,19 +17,23 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.Duration;
 
 @Component
 public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     @Value("${oauth2.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
-    public OAuthSuccessHandler(UserRepository userRepository, JwtService jwtService) {
+    public OAuthSuccessHandler(UserRepository userRepository, JwtService jwtService,
+                                RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Override
@@ -43,8 +48,11 @@ public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
 
         return userRepository.findByProviderAndProviderId(provider, providerId)
                 .switchIfEmpty(createUser(provider, providerId, username, displayName))
-                .map(user -> jwtService.generateToken(user.getUsername()))
-                .flatMap(jwt -> redirect(exchange.getExchange(), jwt));
+                .flatMap(user -> {
+                    String jwt = jwtService.generateToken(user.getUsername());
+                    return refreshTokenService.create(user.getUsername())
+                            .flatMap(rt -> redirect(exchange.getExchange(), jwt, rt.getToken()));
+                });
     }
 
     private String extractProviderId(OAuth2User oauthUser, String provider) {
@@ -88,9 +96,15 @@ public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
                 }));
     }
 
-    private Mono<Void> redirect(ServerWebExchange exchange, String jwt) {
+    private Mono<Void> redirect(ServerWebExchange exchange, String jwt, String refreshToken) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.FOUND);
+        response.addCookie(ResponseCookie.from("refresh_token", refreshToken)
+                .httpOnly(true)
+                .path("/api/auth")
+                .maxAge(Duration.ofDays(30))
+                .sameSite("Strict")
+                .build());
         response.getHeaders().setLocation(URI.create(frontendUrl + "/auth/callback?token=" + jwt));
         return response.setComplete();
     }

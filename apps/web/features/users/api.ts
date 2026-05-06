@@ -1,16 +1,14 @@
-import { API_BASE, authHeaders } from "../../shared/lib/api-client";
+import { API_BASE, apiFetch } from "../../shared/lib/api-client";
 import { UserProfile, UserStatus, UserSummary } from "../../shared/types";
 
 export async function searchUsers(q: string): Promise<UserSummary[]> {
-  const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(q)}`, {
-    headers: authHeaders(),
-  });
+  const res = await apiFetch(`${API_BASE}/users/search?q=${encodeURIComponent(q)}`);
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function getMe(): Promise<UserProfile | null> {
-  const res = await fetch(`${API_BASE}/users/me`, { headers: authHeaders() });
+  const res = await apiFetch(`${API_BASE}/users/me`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -22,9 +20,9 @@ export async function updateProfile(
   status: UserStatus,
   statusText: string,
 ): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE}/users/me`, {
+  const res = await apiFetch(`${API_BASE}/users/me`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ displayName, avatarColor, showReadReceipts, status, statusText }),
   });
   if (!res.ok) throw new Error("Failed to update profile");

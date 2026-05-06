@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .pathMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        .pathMatchers("/api/auth/refresh", "/api/auth/logout").permitAll()
                         .pathMatchers("/ws/**").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/rooms", "/api/rooms/*/presence").permitAll()
                         .pathMatchers("/api/messages/*/reactions").authenticated()

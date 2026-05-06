@@ -4,7 +4,15 @@ server:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  expiration: ${JWT_EXPIRATION:3600000}           # 1 hour
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000000}  # 30 days
+
+rate-limit:
+  ws-messages-per-minute: ${RATE_LIMIT_WS_MSG:30}
+  ws-joins-per-minute: ${RATE_LIMIT_WS_JOIN:10}
+  uploads-per-day: ${RATE_LIMIT_UPLOADS:20}
+  private-rooms-per-month: ${RATE_LIMIT_PRIVATE_ROOMS:2}
+  public-rooms-per-month: ${RATE_LIMIT_PUBLIC_ROOMS:5}
 
 spring:
   application:
