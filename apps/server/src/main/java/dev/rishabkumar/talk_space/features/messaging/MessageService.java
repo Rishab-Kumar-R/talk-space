@@ -2,6 +2,7 @@ package dev.rishabkumar.talk_space.features.messaging;
 
 import dev.rishabkumar.talk_space.shared.security.EncryptionService;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -98,6 +99,21 @@ public class MessageService {
                 })
                 .flatMap(saved -> broadcastService.publishMessageDeleted(saved.getId(), saved.getRoomId()))
                 .then();
+    }
+
+    public Flux<Message> getThread(String rootMessageId) {
+        return messageRepository.findByThreadIdOrderByTimestampAsc(rootMessageId)
+                .map(this::decrypt);
+    }
+
+    public Mono<Void> incrementThreadCount(String messageId) {
+        return messageRepository.incrementThreadCount(messageId).then();
+    }
+
+    public Flux<Message> getMentions(String username, int limit) {
+        return messageRepository.findByMentionsContainingOrderByTimestampDesc(
+                username, PageRequest.of(0, limit))
+                .map(this::decrypt);
     }
 
     /** Save an already-constructed message (used by WebSocket handler). */

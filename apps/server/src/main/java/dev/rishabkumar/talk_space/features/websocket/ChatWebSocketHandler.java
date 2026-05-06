@@ -8,10 +8,8 @@ import dev.rishabkumar.talk_space.features.room.RoomRepository;
 import dev.rishabkumar.talk_space.shared.metrics.AppMetrics;
 import dev.rishabkumar.talk_space.shared.ratelimit.RateLimitService;
 import dev.rishabkumar.talk_space.shared.security.JwtService;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.ReactiveSubscription;
-import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
@@ -24,13 +22,17 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class ChatWebSocketHandler implements WebSocketHandler {
 
-    private final ReactiveRedisTemplate<String, String> redisTemplate;
     private final ReactiveRedisMessageListenerContainer listenerContainer;
     private final RoomRepository roomRepository;
     private final MessageService messageService;
@@ -48,7 +50,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     private int wsJoinLimit;
 
     public ChatWebSocketHandler(
-            @Qualifier("reactiveStringRedisTemplate") ReactiveRedisTemplate<String, String> redisTemplate,
             ReactiveRedisMessageListenerContainer listenerContainer,
             RoomRepository roomRepository,
             MessageService messageService,
@@ -58,7 +59,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             ObjectMapper objectMapper,
             AppMetrics metrics,
             RateLimitService rateLimitService) {
-        this.redisTemplate = redisTemplate;
         this.listenerContainer = listenerContainer;
         this.roomRepository = roomRepository;
         this.messageService = messageService;
@@ -149,8 +149,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 });
     }
 
-    private Mono<Long> saveAndBroadcast(Map<String, Object> event, String roomId,
-                                         String username, String channel) {
+    private Mono<Void> saveAndBroadcast(Map<String, Object> event, String roomId,
+                                        String username, String channel) {
         String plaintextContent = (String) event.getOrDefault("content", "");
         String replyToId = (String) event.get("replyToId");
         String plaintextReplyPreview = (String) event.get("replyPreview");
@@ -159,10 +159,13 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         String fileName = (String) event.get("fileName");
         Number fileSizeRaw = (Number) event.get("fileSize");
         String mimeType = (String) event.get("mimeType");
+        String threadId = (String) event.get("threadId");
 
         Message message = new Message(roomId, username, username,
                 plaintextContent.isBlank() ? null : messageService.encrypt(plaintextContent));
         message.setTimestamp(Instant.now());
+        message.setMentions(extractMentions(plaintextContent));
+        message.setThreadId(threadId);
         message.setMessageType(messageType);
         if (fileUrl != null) {
             message.setFileUrl(fileUrl);
@@ -180,7 +183,6 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             try {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> outEvent = objectMapper.convertValue(saved, Map.class);
-                outEvent.put("type", "message");
                 outEvent.put("content", plaintextContent);
                 if (plaintextReplyPreview != null) outEvent.put("replyPreview", plaintextReplyPreview);
                 if (fileUrl != null) {
@@ -190,11 +192,34 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                     outEvent.put("mimeType", mimeType);
                     outEvent.put("messageType", messageType);
                 }
-                return broadcastService.publish(roomId, outEvent);
+
+                if (threadId != null) {
+                    outEvent.put("type", "thread_reply");
+                    Map<String, Object> countEvent = new HashMap<>();
+                    countEvent.put("type", "thread_count_updated");
+                    countEvent.put("rootId", threadId);
+                    return messageService.incrementThreadCount(threadId)
+                            .then(broadcastService.publish(roomId, outEvent))
+                            .then(broadcastService.publish(roomId, Map.copyOf(countEvent)))
+                            .then();
+                } else {
+                    outEvent.put("type", "message");
+                    return broadcastService.publish(roomId, outEvent).then();
+                }
             } catch (Exception e) {
-                return Mono.error(e);
+                return Mono.<Void>error(e);
             }
         });
+    }
+
+    private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9._-]+)");
+
+    private List<String> extractMentions(String text) {
+        if (text == null || text.isBlank()) return List.of();
+        Matcher m = MENTION_PATTERN.matcher(text);
+        LinkedHashSet<String> found = new LinkedHashSet<>();
+        while (m.find()) found.add(m.group(1));
+        return new ArrayList<>(found);
     }
 
     private String extractToken(String query) {

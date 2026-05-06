@@ -41,3 +41,15 @@ export async function deleteMessage(messageId: string): Promise<void> {
   const res = await apiFetch(`${API_BASE}/messages/${messageId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete message");
 }
+
+export async function getThread(roomId: string, messageId: string): Promise<Message[]> {
+  const res = await apiFetch(`${API_BASE}/rooms/${roomId}/messages/${messageId}/thread`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getMentions(limit = 50): Promise<Message[]> {
+  const res = await apiFetch(`${API_BASE}/messages/mentions?limit=${limit}`);
+  if (!res.ok) return [];
+  return res.json();
+}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef } from "react";
-import { ReplyTo } from "../../../shared/types";
+import { useRef, useState } from "react";
+import { ReplyTo, UserSummary } from "../../../shared/types";
 import { applyFormat } from "../../../shared/lib/markdown";
+import { searchUsers } from "../../users/api";
 
 interface Props {
   input: string;
@@ -25,6 +26,13 @@ const FORMAT_BUTTONS = [
   { label: "```", title: "Code block", prefix: "```\n", suffix: "\n```", cls: "font-mono text-[10px]" },
 ];
 
+function getMentionContext(value: string, cursor: number): { start: number; query: string } | null {
+  const before = value.slice(0, cursor);
+  const match = before.match(/@([a-zA-Z0-9._-]*)$/);
+  if (!match) return null;
+  return { start: before.length - match[0].length, query: match[1] };
+}
+
 export function MessageInput({
   input, setInput,
   replyTo, onClearReply,
@@ -35,6 +43,33 @@ export function MessageInput({
 }: Props) {
   const messageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mentionCtx, setMentionCtx] = useState<{ start: number; query: string } | null>(null);
+  const [suggestions, setSuggestions] = useState<UserSummary[]>([]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setInput(val);
+    onTyping();
+    const cursor = e.target.selectionStart ?? val.length;
+    const ctx = getMentionContext(val, cursor);
+    if (ctx && ctx.query.length >= 1) {
+      setMentionCtx(ctx);
+      searchUsers(ctx.query).then(setSuggestions);
+    } else {
+      setMentionCtx(null);
+      setSuggestions([]);
+    }
+  }
+
+  function selectMention(username: string) {
+    if (!mentionCtx) return;
+    const before = input.slice(0, mentionCtx.start);
+    const after = input.slice(mentionCtx.start + 1 + mentionCtx.query.length);
+    setInput(`${before}@${username} ${after}`);
+    setMentionCtx(null);
+    setSuggestions([]);
+    requestAnimationFrame(() => messageInputRef.current?.focus());
+  }
 
   function handleFormat(prefix: string, suffix: string) {
     const el = messageInputRef.current;
@@ -77,6 +112,21 @@ export function MessageInput({
       )}
 
       <form onSubmit={onSend}>
+        {suggestions.length > 0 && mentionCtx && (
+          <div className="mb-2 bg-warm-100 border border-warm-300 rounded-xl overflow-hidden shadow-sm">
+            {suggestions.slice(0, 5).map((u) => (
+              <button
+                key={u.username}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); selectMention(u.username); }}
+                className="w-full text-left px-3 py-2 text-sm text-warm-900 hover:bg-warm-200 transition-colors flex items-center gap-2"
+              >
+                <span className="font-semibold">@{u.username}</span>
+                {u.statusText && <span className="text-warm-500 text-xs truncate">{u.statusText}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-3 bg-white border border-warm-300 rounded-2xl px-4 py-3 focus-within:border-warm-500 transition-colors">
           <input
             ref={fileInputRef}
@@ -97,7 +147,7 @@ export function MessageInput({
           <input
             ref={messageInputRef}
             value={input}
-            onChange={(e) => { setInput(e.target.value); onTyping(); }}
+            onChange={handleChange}
             onPaste={onPaste}
             placeholder={placeholder}
             className="flex-1 bg-transparent text-warm-900 text-sm outline-none placeholder:text-warm-500"

@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,10 @@ public class Message {
     private Map<String, List<String>> reactions = new HashMap<>();
     private Instant editedAt;
     private boolean deleted = false;
+    private List<String> mentions = new ArrayList<>();
+    @Indexed
+    private String threadId;
+    private int threadCount = 0;
     private String messageType = "text";
     private String fileUrl;
     private String fileName;
@@ -63,6 +68,12 @@ public class Message {
     public void setEditedAt(Instant editedAt) { this.editedAt = editedAt; }
     public boolean isDeleted() { return deleted; }
     public void setDeleted(boolean deleted) { this.deleted = deleted; }
+    public List<String> getMentions() { return mentions; }
+    public void setMentions(List<String> mentions) { this.mentions = mentions; }
+    public String getThreadId() { return threadId; }
+    public void setThreadId(String threadId) { this.threadId = threadId; }
+    public int getThreadCount() { return threadCount; }
+    public void setThreadCount(int threadCount) { this.threadCount = threadCount; }
     public String getMessageType() { return messageType; }
     public void setMessageType(String messageType) { this.messageType = messageType; }
     public String getFileUrl() { return fileUrl; }

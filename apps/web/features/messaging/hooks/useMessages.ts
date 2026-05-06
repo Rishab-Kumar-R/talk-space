@@ -56,6 +56,10 @@ export function useMessages(
         delete next[event.id];
         return next;
       });
+    } else if (event.type === "thread_count_updated") {
+      setHistory((prev) =>
+        prev.map((m) => m.id === event.rootId ? { ...m, threadCount: (m.threadCount ?? 0) + 1 } : m),
+      );
     }
   }, [wsEvents]);
 

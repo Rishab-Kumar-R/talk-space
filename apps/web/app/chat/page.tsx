@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { useWebSocket } from "../../features/messaging/hooks/useWebSocket";
 import { useMessages } from "../../features/messaging/hooks/useMessages";
+import { useThread } from "../../features/messaging/hooks/useThread";
 import { useTyping } from "../../features/messaging/hooks/useTyping";
 import { useRooms } from "../../features/rooms/hooks/useRooms";
 import { useRoomMembers } from "../../features/rooms/hooks/useRoomMembers";
@@ -21,6 +22,7 @@ import { RoomSettingsModal } from "../../features/rooms/components/RoomSettingsM
 import { MessageItem } from "../../features/messaging/components/MessageItem";
 import { MessageInput } from "../../features/messaging/components/MessageInput";
 import { SearchPanel } from "../../features/search/components/SearchPanel";
+import { ThreadPanel } from "../../features/messaging/components/ThreadPanel";
 import { PinnedPanel } from "../../features/pinning/components/PinnedPanel";
 import { PinLimitModal } from "../../features/pinning/components/PinLimitModal";
 import { ProfileModal } from "../../features/users/components/ProfileModal";
@@ -68,8 +70,10 @@ export default function ChatPage() {
   const rooms = useRooms();
   const { activeRoom, selectRoom, updateRoom, removeRoom } = rooms;
 
-  const { messages, wsEvents, typingUsers, connected, sendMessage, sendTyping } =
+  const { messages, wsEvents, threadReplies, typingUsers, connected, sendMessage, sendTyping } =
     useWebSocket(activeRoom?.name ?? "");
+
+  const thread = useThread(activeRoom?.name ?? "", threadReplies);
 
   const msgs = useMessages(
     activeRoom,
@@ -161,6 +165,10 @@ export default function ChatPage() {
     setReplyTo(null);
   }
 
+  function handleSendThreadReply(content: string, threadId: string) {
+    sendMessage(content, undefined, undefined, undefined, threadId);
+  }
+
   async function handleReaction(messageId: string, emoji: string) {
     const allMsgs = [...msgs.history, ...messages];
     const prev = msgs.optimisticReaction(messageId, emoji, username, allMsgs);
@@ -198,7 +206,7 @@ export default function ChatPage() {
 
   const seen = new Set<string>();
   const allMessages = [...msgs.history, ...messages].filter((m) => {
-    if (!m.id || seen.has(m.id)) return false;
+    if (!m.id || seen.has(m.id) || m.threadId) return false;
     seen.add(m.id);
     return true;
   });
@@ -237,8 +245,9 @@ export default function ChatPage() {
         />
       </div>
 
-      {/* Chat area */}
-      <main className={`${mobileView === "rooms" ? "hidden" : "flex"} md:flex flex-1 flex-col min-w-0 bg-warm-100`}>
+      {/* Chat area + thread panel */}
+      <div className={`${mobileView === "rooms" ? "hidden" : "flex"} md:flex flex-1 min-w-0`}>
+      <main className="flex flex-1 flex-col min-w-0 bg-warm-100">
 
         {/* Header */}
         <header className="px-5 py-4 border-b border-warm-300 flex items-center gap-3 bg-warm-100 shrink-0">
@@ -360,6 +369,7 @@ export default function ChatPage() {
                 onPin={pinning.handlePin}
                 onUnpin={pinning.handleUnpin}
                 onFetchReceipts={fetchReceipts}
+                onOpenThread={thread.openThread}
               />
             );
           })}
@@ -389,6 +399,18 @@ export default function ChatPage() {
           }
         />
       </main>
+
+      {thread.openThreadId && thread.rootMessage && (
+        <ThreadPanel
+          rootMessage={thread.rootMessage}
+          threadMessages={thread.threadMessages}
+          loading={thread.loading}
+          username={username}
+          onClose={thread.closeThread}
+          onSendReply={handleSendThreadReply}
+        />
+      )}
+      </div>
 
       {/* Modals */}
       {profile.showProfile && (

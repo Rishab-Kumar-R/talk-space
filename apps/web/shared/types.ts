@@ -14,6 +14,9 @@ export interface Message {
   reactions?: Record<string, string[]>;
   editedAt?: string;
   deleted?: boolean;
+  mentions?: string[];
+  threadId?: string;
+  threadCount?: number;
   messageType?: "text" | "image" | "file";
   fileUrl?: string;
   fileName?: string;

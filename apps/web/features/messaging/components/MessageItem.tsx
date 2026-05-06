@@ -28,6 +28,7 @@ interface Props {
   onPin: (msg: Message) => void;
   onUnpin: (messageId: string) => void;
   onFetchReceipts: (messageId: string) => void;
+  onOpenThread: (msg: Message) => void;
 }
 
 export function MessageItem({
@@ -36,7 +37,7 @@ export function MessageItem({
   emojiPickerFor, setEmojiPickerFor,
   currentIsDM, pinnedIds, receipts, showReadReceipts,
   onReply, onReaction, onStartEdit, onSubmitEdit, onCancelEdit,
-  onDelete, onPin, onUnpin, onFetchReceipts,
+  onDelete, onPin, onUnpin, onFetchReceipts, onOpenThread,
 }: Props) {
   const reactionEntries = Object.entries(display.reactions ?? {});
 
@@ -116,6 +117,16 @@ export function MessageItem({
             ))}
           </div>
         )}
+
+        {!currentIsDM && (display.threadCount ?? 0) > 0 && (
+          <button
+            onClick={() => onOpenThread(display)}
+            className="flex items-center gap-1 mt-1.5 text-xs text-warm-600 hover:text-warm-900 hover:underline transition-colors"
+          >
+            <span>💬</span>
+            <span className="font-medium">{display.threadCount} {display.threadCount === 1 ? "reply" : "replies"}</span>
+          </button>
+        )}
       </div>
 
       <div
@@ -146,6 +157,15 @@ export function MessageItem({
             >
               ↩
             </button>
+            {!currentIsDM && (
+              <button
+                onClick={() => onOpenThread(display)}
+                className="text-warm-500 hover:text-warm-800 text-sm px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"
+                title="Open thread"
+              >
+                💬
+              </button>
+            )}
             <button
               onClick={() => setEmojiPickerFor(msg.id)}
               className="text-warm-500 hover:text-warm-800 text-sm px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"

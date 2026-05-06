@@ -33,6 +33,19 @@ public class MessageController {
         return messageService.search(roomId, q, limit);
     }
 
+    @GetMapping("/rooms/{roomId}/messages/{messageId}/thread")
+    public Flux<Message> getThread(@PathVariable String roomId, @PathVariable String messageId) {
+        return messageService.getThread(messageId);
+    }
+
+    @GetMapping("/messages/mentions")
+    public Flux<Message> getMentions(
+            @RequestParam(defaultValue = "50") int limit) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMapMany(username -> messageService.getMentions(username, limit));
+    }
+
     @PostMapping("/messages/{messageId}/reactions")
     public Mono<Message> toggleReaction(
             @PathVariable String messageId,

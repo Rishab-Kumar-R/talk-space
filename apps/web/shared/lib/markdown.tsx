@@ -9,19 +9,27 @@ marked.use({ gfm: true, breaks: true });
 const renderer = new marked.Renderer();
 renderer.image = () => "";
 
-export function MarkdownContent({ content }: { content: string }) {
+function highlightMentions(text: string): string {
+  return text.replace(
+    /@([a-zA-Z0-9._-]+)/g,
+    '<span class="mention">@$1</span>',
+  );
+}
+
+export function MarkdownContent({ content, currentUser }: { content: string; currentUser?: string }) {
   const html = useMemo(() => {
-    const raw = marked.parse(content, { renderer }) as string;
+    const withMentions = highlightMentions(content);
+    const raw = marked.parse(withMentions, { renderer }) as string;
     return DOMPurify.sanitize(raw, {
-      ALLOWED_TAGS: ["p", "strong", "em", "code", "pre", "a", "ul", "ol", "li", "blockquote", "br"],
-      ALLOWED_ATTR: ["href", "target", "rel"],
+      ALLOWED_TAGS: ["p", "strong", "em", "code", "pre", "a", "ul", "ol", "li", "blockquote", "br", "span"],
+      ALLOWED_ATTR: ["href", "target", "rel", "class"],
       FORCE_BODY: false,
     });
   }, [content]);
 
   return (
     <div
-      className="msg-content text-warm-800 text-sm leading-relaxed break-words"
+      className="msg-content text-warm-800 text-sm leading-relaxed break-words [&_.mention]:bg-warm-300 [&_.mention]:text-warm-900 [&_.mention]:rounded [&_.mention]:px-1 [&_.mention]:font-semibold [&_.mention]:text-xs"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

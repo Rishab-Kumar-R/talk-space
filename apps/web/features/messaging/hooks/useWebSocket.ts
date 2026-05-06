@@ -3,11 +3,13 @@ import { Message } from "../../../shared/types";
 
 export type WsEvent =
   | { type: "message_edited"; id: string; content: string; editedAt: string }
-  | { type: "message_deleted"; id: string };
+  | { type: "message_deleted"; id: string }
+  | { type: "thread_count_updated"; rootId: string };
 
 export function useWebSocket(roomId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [wsEvents, setWsEvents] = useState<WsEvent[]>([]);
+  const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -57,7 +59,10 @@ export function useWebSocket(roomId: string) {
         } else if (data.type === "message") {
           const { type: _type, ...message } = data;
           setMessages((prev) => [...prev, message as Message]);
-        } else if (data.type === "message_edited" || data.type === "message_deleted") {
+        } else if (data.type === "thread_reply") {
+          const { type: _type, ...message } = data;
+          setThreadReplies((prev) => [...prev, message as Message]);
+        } else if (data.type === "message_edited" || data.type === "message_deleted" || data.type === "thread_count_updated") {
           setWsEvents((prev) => [...prev, data as WsEvent]);
         }
       };
@@ -88,10 +93,11 @@ export function useWebSocket(roomId: string) {
       replyToId?: string,
       replyPreview?: string,
       filePayload?: { fileUrl: string; fileName: string; fileSize: number; mimeType: string; messageType: "image" | "file" },
+      threadId?: string,
     ) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
-          JSON.stringify({ type: "message", content, replyToId, replyPreview, ...filePayload }),
+          JSON.stringify({ type: "message", content, replyToId, replyPreview, threadId, ...filePayload }),
         );
       }
     },
@@ -104,5 +110,5 @@ export function useWebSocket(roomId: string) {
     }
   }, []);
 
-  return { messages, wsEvents, typingUsers, connected, sendMessage, sendTyping };
+  return { messages, wsEvents, threadReplies, typingUsers, connected, sendMessage, sendTyping };
 }
