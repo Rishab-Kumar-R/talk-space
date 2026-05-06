@@ -82,7 +82,7 @@ public class UploadController {
                 })
                 .flatMap(bytes -> {
                     if (bytes.length > maxBytes)
-                        return Mono.error(new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+                        return Mono.error(new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE,
                                 "File exceeds maximum size of %d MB".formatted(maxBytes / 1024 / 1024)));
                     long fileSize = bytes.length;
                     return s3Service.upload(filename, contentType, bytes)

@@ -34,14 +34,14 @@ public class AuthController {
         return refreshTokenService.validate(oldToken)
                 .flatMap(rt -> refreshTokenService.rotate(oldToken, rt.getUsername())
                         .map(newRt -> {
-                            exchange.getResponse().addCookie(buildRefreshCookie(newRt.getToken()));
+                            exchange.getResponse().addCookie(buildRefreshCookie(newRt.getToken()).build());
                             return Map.of("token", jwtService.generateToken(rt.getUsername()));
                         }));
     }
 
     @PostMapping("/logout")
     public Mono<Void> logout(ServerWebExchange exchange) {
-        exchange.getResponse().addCookie(buildRefreshCookie("").maxAge(0));
+        exchange.getResponse().addCookie(buildRefreshCookie("").maxAge(0).build());
         HttpCookie cookie = exchange.getRequest().getCookies().getFirst("refresh_token");
         if (cookie == null) return Mono.empty();
         return refreshTokenService.deleteByToken(cookie.getValue());

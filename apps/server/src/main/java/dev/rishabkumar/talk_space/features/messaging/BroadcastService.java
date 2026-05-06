@@ -1,7 +1,6 @@
 package dev.rishabkumar.talk_space.features.messaging;
 
 import dev.rishabkumar.talk_space.shared.metrics.AppMetrics;
-import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Service;
