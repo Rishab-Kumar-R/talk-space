@@ -14,6 +14,6 @@ FROM gcr.io/distroless/nodejs22-debian12:nonroot
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./.next/static
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 EXPOSE 3000
-CMD ["server.js"]
+CMD ["apps/web/server.js"]
