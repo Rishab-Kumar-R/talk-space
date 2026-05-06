@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+node_modules
+apps/server
+apps/web/.next
+apps/web/node_modules
+packages
+*.md
+docker-compose*.yml

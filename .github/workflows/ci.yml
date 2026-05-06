@@ -6,9 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   backend:
-    name: Backend — build & test
+    name: Backend - build & test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,7 +52,7 @@ jobs:
           path: apps/server/build/reports/tests/
 
   frontend:
-    name: Frontend — typecheck, lint & build
+    name: Frontend - typecheck, lint & build
     runs-on: ubuntu-latest
 
     steps:
