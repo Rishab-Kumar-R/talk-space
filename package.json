@@ -1,5 +1,5 @@
 {
-  "name": "scalable-chat-app",
+  "name": "talk-space",
   "private": true,
   "scripts": {
     "build": "turbo run build",

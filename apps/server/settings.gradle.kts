@@ -1,1 +1,1 @@
-rootProject.name = "chat-app"
+rootProject.name = "talk-space"
