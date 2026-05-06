@@ -3,7 +3,6 @@ WORKDIR /app
 # Copy all workspace manifests so bun sees the full monorepo shape
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
-COPY apps/server/package.json ./apps/server/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/

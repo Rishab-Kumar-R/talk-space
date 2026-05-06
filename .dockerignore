@@ -2,9 +2,8 @@
 .github
 .claude
 node_modules
-apps/server
 apps/web/.next
 apps/web/node_modules
-packages
+apps/server
 *.md
 docker-compose*.yml
