@@ -15,17 +15,21 @@ rate-limit:
   public-rooms-per-month: ${RATE_LIMIT_PUBLIC_ROOMS:5}
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: server
   codec:
     max-in-memory-size: 20MB
   data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/chat_db}
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/chat_db}
   security:
     oauth2:
       client:

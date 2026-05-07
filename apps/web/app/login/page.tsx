@@ -13,7 +13,7 @@ export default function LoginPage() {
 
         <div className="flex flex-col gap-3">
           <a
-            href={`${API_URL}/oauth2/authorize/google`}
+            href={`${API_URL}/oauth2/authorization/google`}
             className="flex items-center justify-center gap-3 bg-warm-100 border border-warm-400 text-warm-900 rounded-xl px-4 py-3 text-sm font-medium hover:bg-warm-200 transition-colors"
           >
             <GoogleIcon />
@@ -21,7 +21,7 @@ export default function LoginPage() {
           </a>
 
           <a
-            href={`${API_URL}/oauth2/authorize/github`}
+            href={`${API_URL}/oauth2/authorization/github`}
             className="flex items-center justify-center gap-3 bg-warm-800 text-warm-50 rounded-xl px-4 py-3 text-sm font-medium hover:bg-warm-900 transition-colors"
           >
             <GitHubIcon />

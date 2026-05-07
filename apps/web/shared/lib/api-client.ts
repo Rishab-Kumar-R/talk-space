@@ -1,20 +1,40 @@
 export const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "") + "/api";
 
+export function safeJson<T>(res: Response): Promise<T | undefined> {
+  return res.text().then(text => {
+    if (!text) return undefined;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return undefined;
+    }
+  });
+}
+
 export function authHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
 async function tryRefresh(): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/auth/refresh`, {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
     method: "POST",
     credentials: "include",
-  });
-  if (!res.ok) return false;
-  const data = await res.json();
-  localStorage.setItem("token", data.token);
-  document.cookie = `token=${data.token}; path=/; SameSite=Lax`;
-  return true;
+  })
+    .then(async res => {
+      if (!res.ok) return false;
+      const data = await res.json();
+      localStorage.setItem("token", data.token);
+      document.cookie = `token=${data.token}; path=/; SameSite=Lax`;
+      return true;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+  return refreshPromise;
 }
 
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {

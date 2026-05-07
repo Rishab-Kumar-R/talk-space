@@ -32,9 +32,9 @@ public class MessageService {
     public Flux<Message> getMessages(String roomId, String before, int limit) {
         PageRequest page = PageRequest.of(0, limit);
         Flux<Message> query = before != null
-                ? messageRepository.findByRoomIdAndTimestampBeforeOrderByTimestampDesc(
+                ? messageRepository.findByRoomIdAndTimestampBeforeAndDeletedFalseOrderByTimestampDesc(
                         roomId, Instant.parse(before), page)
-                : messageRepository.findByRoomIdOrderByTimestampDesc(roomId, page);
+                : messageRepository.findByRoomIdAndDeletedFalseOrderByTimestampDesc(roomId, page);
 
         return query.collectList()
                 .flatMapMany(list -> {
@@ -47,7 +47,7 @@ public class MessageService {
     public Flux<Message> search(String roomId, String q, int limit) {
         if (q == null || q.isBlank()) return Flux.empty();
         String term = q.toLowerCase(Locale.ROOT);
-        return messageRepository.findByRoomIdOrderByTimestampDesc(roomId)
+        return messageRepository.findByRoomIdAndDeletedFalseOrderByTimestampDesc(roomId)
                 .take(500)
                 .map(this::decrypt)
                 .filter(msg -> msg.getContent() != null

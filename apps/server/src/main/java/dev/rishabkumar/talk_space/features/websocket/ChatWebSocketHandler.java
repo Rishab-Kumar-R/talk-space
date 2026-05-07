@@ -76,7 +76,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         String roomId = path.substring(path.lastIndexOf('/') + 1);
         String token = extractToken(session.getHandshakeInfo().getUri().getQuery());
 
-        if (token == null || !jwtService.isValid(token)) return session.close();
+        if (roomId.isBlank() || token == null || !jwtService.isValid(token)) return session.close();
 
         String username = jwtService.extractUsername(token);
 

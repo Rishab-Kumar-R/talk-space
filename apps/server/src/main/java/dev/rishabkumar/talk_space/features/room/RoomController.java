@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -43,8 +44,8 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}/presence")
-    public Flux<String> getPresence(@PathVariable String roomId) {
-        return presenceService.getOnline(roomId);
+    public Mono<List<String>> getPresence(@PathVariable String roomId) {
+        return presenceService.getOnline(roomId).collectList();
     }
 
     @GetMapping("/{roomId}/members")

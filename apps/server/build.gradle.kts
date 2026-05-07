@@ -47,3 +47,45 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    val envFile = projectDir.resolve(".env")
+    if (envFile.exists()) {
+        val props = envFile.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") && it.contains("=") }
+            .associate { line ->
+                val idx = line.indexOf("=")
+                line.substring(0, idx).trim() to line.substring(idx + 1).trim().removeSurrounding("\"")
+            }
+
+        props.forEach { (key, value) ->
+            environment(key, value)
+        }
+
+        props["MONGODB_URI"]?.let { value ->
+            environment("SPRING_MONGODB_URI", value)
+            systemProperty("spring.mongodb.uri", value)
+            args("--spring.mongodb.uri=$value")
+        }
+        props["REDIS_HOST"]?.let { value ->
+            environment("SPRING_DATA_REDIS_HOST", value)
+            systemProperty("spring.data.redis.host", value)
+            args("--spring.data.redis.host=$value")
+        }
+        props["REDIS_PORT"]?.let { value ->
+            environment("SPRING_DATA_REDIS_PORT", value)
+            systemProperty("spring.data.redis.port", value)
+            args("--spring.data.redis.port=$value")
+        }
+        props["REDIS_PASSWORD"]?.let { value ->
+            environment("SPRING_DATA_REDIS_PASSWORD", value)
+            systemProperty("spring.data.redis.password", value)
+            args("--spring.data.redis.password=$value")
+        }
+        props["REDIS_SSL_ENABLED"]?.let { value ->
+            environment("SPRING_DATA_REDIS_SSL_ENABLED", value)
+            systemProperty("spring.data.redis.ssl.enabled", value)
+            args("--spring.data.redis.ssl.enabled=$value")
+        }
+    }
+}

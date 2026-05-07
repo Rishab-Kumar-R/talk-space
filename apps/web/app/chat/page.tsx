@@ -53,12 +53,12 @@ function readActiveDMs(): string[] {
 export default function ChatPage() {
   const router = useRouter();
 
-  const [username] = useState<string>(readUsername);
+  const [username, setUsername] = useState<string>("");
   const [mobileView, setMobileView] = useState<"rooms" | "chat">("rooms");
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<ReplyTo | null>(null);
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null);
-  const [activeDMs, setActiveDMs] = useState<string[]>(readActiveDMs);
+  const [activeDMs, setActiveDMs] = useState<string[]>([]);
   const [showDMSearch, setShowDMSearch] = useState(false);
   const [dmQuery, setDmQuery] = useState("");
   const [dmResults, setDmResults] = useState<UserSummary[]>([]);
@@ -105,6 +105,12 @@ export default function ChatPage() {
   const upload = useUpload(handleSendFile as (payload: { fileUrl: string; fileName: string; fileSize: number; mimeType: string; messageType: "image" | "file" }) => void);
 
   const roomMembers = useRoomMembers(activeRoom, username);
+
+  // Hydrate localStorage-derived state after mount
+  useEffect(() => {
+    setUsername(readUsername());
+    setActiveDMs(readActiveDMs());
+  }, []);
 
   // Auth bootstrap — redirect if no token, then load profile
   useEffect(() => {

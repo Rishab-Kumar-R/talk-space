@@ -23,7 +23,7 @@ public class UserService {
 
     public Flux<UserSummary> search(String query, String currentUser) {
         return userRepository
-                .findByUsernameContainingIgnoreCaseAndUsernameNot(query, currentUser, PageRequest.of(0, 10))
+                .searchByUsernameExcluding(query, currentUser, PageRequest.of(0, 10))
                 .map(u -> new UserSummary(u.getId(), u.getUsername(), u.getStatus(), u.getStatusText()));
     }
 

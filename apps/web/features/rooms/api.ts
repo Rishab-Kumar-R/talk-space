@@ -1,16 +1,16 @@
-import { API_BASE, apiFetch } from "../../shared/lib/api-client";
+import { API_BASE, apiFetch, safeJson } from "../../shared/lib/api-client";
 import { PublicRoomSummary, Room } from "../../shared/types";
 
 export async function getPublicRooms(): Promise<PublicRoomSummary[]> {
   const res = await fetch(`${API_BASE}/rooms/public`);
   if (!res.ok) return [];
-  return res.json();
+  return (await safeJson<PublicRoomSummary[]>(res)) ?? [];
 }
 
 export async function getRooms(): Promise<Room[]> {
   const res = await apiFetch(`${API_BASE}/rooms`);
   if (!res.ok) return [];
-  return res.json();
+  return (await safeJson<Room[]>(res)) ?? [];
 }
 
 export async function createRoom(name: string, isPrivate = false): Promise<Room> {
@@ -20,19 +20,19 @@ export async function createRoom(name: string, isPrivate = false): Promise<Room>
     body: JSON.stringify({ name, isPrivate }),
   });
   if (!res.ok) throw new Error("Could not create room");
-  return res.json();
+  return (await safeJson<Room>(res))!;
 }
 
 export async function getPresence(roomId: string): Promise<string[]> {
   const res = await apiFetch(`${API_BASE}/rooms/${roomId}/presence`);
   if (!res.ok) return [];
-  return res.json();
+  return (await safeJson<string[]>(res)) ?? [];
 }
 
 export async function getRoomMembers(roomId: string): Promise<Record<string, string>> {
   const res = await apiFetch(`${API_BASE}/rooms/${roomId}/members`);
   if (!res.ok) return {};
-  return res.json();
+  return (await safeJson<Record<string, string>>(res)) ?? {};
 }
 
 export async function inviteMember(roomId: string, username: string): Promise<Room> {
@@ -42,7 +42,7 @@ export async function inviteMember(roomId: string, username: string): Promise<Ro
     body: JSON.stringify({ username }),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return (await safeJson<Room>(res))!;
 }
 
 export async function removeMember(roomId: string, username: string): Promise<Room> {
@@ -50,7 +50,7 @@ export async function removeMember(roomId: string, username: string): Promise<Ro
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return (await safeJson<Room>(res))!;
 }
 
 export async function markRoomRead(roomId: string): Promise<void> {
@@ -60,5 +60,5 @@ export async function markRoomRead(roomId: string): Promise<void> {
 export async function getUnreadCounts(): Promise<Record<string, number>> {
   const res = await apiFetch(`${API_BASE}/rooms/unread`);
   if (!res.ok) return {};
-  return res.json();
+  return (await safeJson<Record<string, number>>(res)) ?? {};
 }

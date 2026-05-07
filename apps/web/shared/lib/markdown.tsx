@@ -18,7 +18,7 @@ function highlightMentions(text: string): string {
 
 export function MarkdownContent({ content }: { content: string }) {
   const html = useMemo(() => {
-    const withMentions = highlightMentions(content);
+    const withMentions = highlightMentions(content ?? "");
     const raw = marked.parse(withMentions, { renderer }) as string;
     return DOMPurify.sanitize(raw, {
       ALLOWED_TAGS: ["p", "strong", "em", "code", "pre", "a", "ul", "ol", "li", "blockquote", "br", "span"],

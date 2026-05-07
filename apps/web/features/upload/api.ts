@@ -1,4 +1,4 @@
-import { API_BASE, apiFetch } from "../../shared/lib/api-client";
+import { API_BASE, apiFetch, safeJson } from "../../shared/lib/api-client";
 import { UploadResult } from "../../shared/types";
 
 export async function uploadFile(file: File): Promise<UploadResult> {
@@ -12,5 +12,5 @@ export async function uploadFile(file: File): Promise<UploadResult> {
     const text = await res.text().catch(() => "Upload failed");
     throw new Error(text);
   }
-  return res.json();
+  return safeJson<UploadResult>(res);
 }

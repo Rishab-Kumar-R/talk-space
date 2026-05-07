@@ -10,8 +10,10 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 
 public interface MessageRepository extends ReactiveMongoRepository<Message, String> {
+    Flux<Message> findByRoomIdAndDeletedFalseOrderByTimestampDesc(String roomId, Pageable pageable);
+    Flux<Message> findByRoomIdAndTimestampBeforeAndDeletedFalseOrderByTimestampDesc(String roomId, Instant before, Pageable pageable);
+    Flux<Message> findByRoomIdAndDeletedFalseOrderByTimestampDesc(String roomId);
     Flux<Message> findByRoomIdOrderByTimestampDesc(String roomId, Pageable pageable);
-    Flux<Message> findByRoomIdAndTimestampBeforeOrderByTimestampDesc(String roomId, Instant before, Pageable pageable);
     Flux<Message> findByRoomIdOrderByTimestampDesc(String roomId);
     Mono<Long> countByRoomIdAndTimestampAfter(String roomId, Instant after);
     Mono<Message> findFirstByRoomIdOrderByTimestampDesc(String roomId);

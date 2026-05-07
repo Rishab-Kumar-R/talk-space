@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { markMessageRead, getReceipts } from "../api";
 import { Message, ReadReceipt } from "../../../shared/types";
 
@@ -12,6 +12,7 @@ export function useReadReceipts(
   scrollContainerRef: React.RefObject<HTMLDivElement | null>,
 ) {
   const [receipts, setReceipts] = useState<Record<string, ReadReceipt[]>>({});
+  const markedIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!enabled || history.length === 0) return;
@@ -32,7 +33,10 @@ export function useReadReceipts(
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const id = (entry.target as HTMLElement).dataset.messageId;
-            if (id) markMessageRead(id);
+            if (id && !markedIds.current.has(id)) {
+              markedIds.current.add(id);
+              markMessageRead(id);
+            }
           }
         });
       },
