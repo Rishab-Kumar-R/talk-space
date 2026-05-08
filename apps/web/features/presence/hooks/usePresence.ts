@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPresence } from "../../rooms/api";
+import { getPresence, getGlobalPresence } from "../../rooms/api";
 import { isDM } from "../../../shared/lib/utils";
 
 export function usePresence(activeRoomName: string | null) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [onlineGlobal, setOnlineGlobal] = useState<string[]>([]);
 
   useEffect(() => {
     if (!activeRoomName || isDM(activeRoomName)) {
@@ -18,5 +19,12 @@ export function usePresence(activeRoomName: string | null) {
     return () => clearInterval(interval);
   }, [activeRoomName]);
 
-  return { onlineUsers };
+  useEffect(() => {
+    const poll = () => getGlobalPresence().then(setOnlineGlobal);
+    poll();
+    const interval = setInterval(poll, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return { onlineUsers, onlineGlobal };
 }

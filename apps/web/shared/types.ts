@@ -11,6 +11,7 @@ export interface Message {
   timestamp: string;
   replyToId?: string;
   replyPreview?: string;
+  replyToUsername?: string;
   reactions?: Record<string, string[]>;
   editedAt?: string;
   deleted?: boolean;
@@ -32,6 +33,7 @@ export interface Room {
   pinnedMessageIds?: string[];
   isPrivate?: boolean;
   memberRoles?: Record<string, string>;
+  description?: string;
 }
 
 export interface UserSummary {

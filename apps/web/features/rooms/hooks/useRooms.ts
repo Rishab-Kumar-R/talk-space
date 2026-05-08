@@ -8,6 +8,7 @@ export function useRooms() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [mentionCounts, setMentionCounts] = useState<Record<string, number>>({});
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomPrivate, setNewRoomPrivate] = useState(false);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
@@ -24,6 +25,7 @@ export function useRooms() {
   const selectRoom = useCallback((room: Room) => {
     setActiveRoom(room);
     setUnreadCounts((prev) => ({ ...prev, [room.name]: 0 }));
+    setMentionCounts((prev) => ({ ...prev, [room.name]: 0 }));
     markRoomRead(room.name);
   }, []);
 
@@ -55,6 +57,7 @@ export function useRooms() {
     rooms, setRooms,
     activeRoom, setActiveRoom, selectRoom,
     unreadCounts, setUnreadCounts,
+    mentionCounts, setMentionCounts,
     newRoomName, setNewRoomName,
     newRoomPrivate, setNewRoomPrivate,
     showCreateRoom, setShowCreateRoom,

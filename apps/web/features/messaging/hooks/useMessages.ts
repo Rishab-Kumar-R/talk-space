@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { getMessages } from "../api";
 import { Message, Room } from "../../../shared/types";
 import { WsEvent } from "./useWebSocket";
@@ -26,9 +27,11 @@ export function useMessages(
     setHasMore(true);
     setMessageOverrides({});
     getMessages(activeRoom.name).then((msgs) => {
-      setHistory(msgs);
-      setHasMore(msgs.length === 30);
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 0);
+      flushSync(() => {
+        setHistory(msgs);
+        setHasMore(msgs.length === 30);
+      });
+      bottomRef.current?.scrollIntoView({ behavior: "instant" });
     });
   }, [activeRoom, bottomRef]);
 

@@ -12,5 +12,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
     const text = await res.text().catch(() => "Upload failed");
     throw new Error(text);
   }
-  return safeJson<UploadResult>(res);
+  const data = await safeJson<UploadResult>(res);
+  if (!data) throw new Error("Upload failed: empty response");
+  return data;
 }

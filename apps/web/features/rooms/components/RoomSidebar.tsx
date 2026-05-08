@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react";
 import { Room, UserProfile } from "../../../shared/types";
 import { isDM, dmPartner } from "../../../shared/lib/utils";
 import { Avatar } from "../../users/components/Avatar";
-import { StatusDot, STATUS_LABEL } from "../../users/components/StatusDot";
+import { STATUS_LABEL } from "../../users/components/StatusDot";
 
 interface Props {
   rooms: Room[];
@@ -168,7 +168,6 @@ export function RoomSidebar({
               {myProfile?.displayName || username}
             </p>
             <div className="flex items-center gap-1.5 mt-1">
-              <StatusDot status={myProfile?.status ?? "available"} size={8} />
               <span className="text-warm-600 text-[10px]">
                 {myProfile?.statusText || STATUS_LABEL[myProfile?.status ?? "available"]}
               </span>

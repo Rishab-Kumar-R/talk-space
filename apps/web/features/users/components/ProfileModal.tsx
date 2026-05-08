@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { UserStatus } from "../../../shared/types";
 import { PROFILE_COLORS } from "../../../shared/lib/utils";
 import { Avatar } from "./Avatar";
@@ -22,6 +23,12 @@ interface Props {
   onClose: () => void;
 }
 
+const STATUS_COLORS: Record<UserStatus, string> = {
+  available: "#10b981",
+  away: "#f59e0b",
+  dnd: "#ef4444",
+};
+
 export function ProfileModal({
   username,
   editDisplayName, setEditDisplayName,
@@ -34,52 +41,82 @@ export function ProfileModal({
   onClose,
 }: Props) {
   return (
-    <div
-      className="fixed inset-0 bg-black/25 flex items-center justify-center z-50 px-4"
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" onClick={onClose}
+      style={{ backdropFilter: "blur(12px) saturate(140%)", WebkitBackdropFilter: "blur(12px) saturate(140%)" }}>
       <div
-        className="bg-warm-50 rounded-2xl w-full max-w-sm shadow-xl overflow-hidden"
+        style={{
+          background: "var(--panel)",
+          border: "1px solid var(--border)",
+          boxShadow: "var(--sh-4)",
+          borderRadius: 12,
+          width: "100%",
+          maxWidth: 400,
+          overflow: "hidden",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-4">
-          <p className="text-warm-900 font-semibold text-sm mb-4">Edit Profile</p>
+        {/* Header */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "16px 20px 14px",
+          borderBottom: "1px solid var(--border)",
+        }}>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Edit profile</p>
+          <button className="icon-btn" onClick={onClose}><X size={15} /></button>
+        </div>
 
-          <div className="flex justify-center mb-4">
-            <Avatar name={username} size={64} color={editAvatarColor} />
+        <form onSubmit={onSave}>
+          {/* Avatar preview */}
+          <div style={{ display: "flex", justifyContent: "center", padding: "24px 0 8px" }}>
+            <div style={{ position: "relative", cursor: "pointer" }}>
+              <Avatar name={username} size={72} color={editAvatarColor} style={{ borderRadius: "50%" }} />
+            </div>
           </div>
 
-          <form onSubmit={onSave} className="flex flex-col gap-4">
+          <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 18 }}>
+
+            {/* Display name */}
             <div>
-              <label className="text-warm-700 text-xs font-semibold uppercase tracking-wide block mb-1.5">
-                Display Name
+              <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", display: "block", marginBottom: 6 }}>
+                Display name
               </label>
               <input
                 value={editDisplayName}
                 onChange={(e) => setEditDisplayName(e.target.value)}
                 placeholder={username}
-                className="w-full bg-warm-200 border border-warm-300 rounded-xl px-3 py-2.5 text-sm text-warm-900 outline-none focus:border-warm-600 placeholder:text-warm-500"
+                style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 8,
+                  border: "1px solid var(--border)", outline: "none",
+                  background: "transparent", color: "var(--text)",
+                  fontSize: 14, fontFamily: "inherit",
+                  transition: "border-color .15s",
+                }}
+                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border-strong)"; (e.target as HTMLInputElement).style.boxShadow = "var(--sh-glow)"; }}
+                onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border)"; (e.target as HTMLInputElement).style.boxShadow = "none"; }}
               />
-              <p className="text-warm-500 text-xs mt-1">Shown in the sidebar. Username stays the same.</p>
+              <p style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 4 }}>Shown in the sidebar. Username stays the same.</p>
             </div>
 
+            {/* Status */}
             <div>
-              <label className="text-warm-700 text-xs font-semibold uppercase tracking-wide block mb-2">
+              <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", display: "block", marginBottom: 8 }}>
                 Status
               </label>
-              <div className="flex gap-2 mb-2">
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                 {(["available", "away", "dnd"] as UserStatus[]).map((s) => (
                   <button
-                    key={s}
-                    type="button"
-                    onClick={() => setEditStatus(s)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-medium transition-all ${
-                      editStatus === s
-                        ? "border-warm-700 bg-warm-200 text-warm-900"
-                        : "border-warm-300 text-warm-600 hover:border-warm-500"
-                    }`}
+                    key={s} type="button" onClick={() => setEditStatus(s)}
+                    style={{
+                      flex: 1, padding: "7px 4px", borderRadius: 8, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      border: `1px solid ${editStatus === s ? STATUS_COLORS[s] : "var(--border)"}`,
+                      background: editStatus === s ? `${STATUS_COLORS[s]}18` : "transparent",
+                      color: editStatus === s ? STATUS_COLORS[s] : "var(--text-muted)",
+                      fontSize: 12.5, fontWeight: editStatus === s ? 600 : 400,
+                      fontFamily: "inherit", transition: "all .12s",
+                    }}
                   >
-                    <StatusDot status={s} size={8} />
+                    <StatusDot status={s} size={7} />
                     {STATUS_LABEL[s]}
                   </button>
                 ))}
@@ -89,67 +126,94 @@ export function ProfileModal({
                 onChange={(e) => setEditStatusText(e.target.value)}
                 placeholder="What's your status? (optional)"
                 maxLength={80}
-                className="w-full bg-warm-200 border border-warm-300 rounded-xl px-3 py-2 text-sm text-warm-900 outline-none focus:border-warm-600 placeholder:text-warm-500"
+                style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 8,
+                  border: "1px solid var(--border)", outline: "none",
+                  background: "transparent", color: "var(--text)",
+                  fontSize: 13.5, fontFamily: "inherit",
+                }}
+                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border-strong)"; }}
+                onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border)"; }}
               />
             </div>
 
+            {/* Avatar color */}
             <div>
-              <label className="text-warm-700 text-xs font-semibold uppercase tracking-wide block mb-2">
-                Avatar Color
+              <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", display: "block", marginBottom: 8 }}>
+                Avatar color
               </label>
-              <div className="flex gap-2 flex-wrap">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {PROFILE_COLORS.map((color) => (
                   <button
-                    key={color}
-                    type="button"
-                    onClick={() => setEditAvatarColor(color)}
-                    style={{ background: color }}
-                    className={`w-8 h-8 rounded-full transition-transform ${
-                      editAvatarColor === color ? "ring-2 ring-offset-2 ring-warm-700 scale-110" : "hover:scale-105"
-                    }`}
+                    key={color} type="button" onClick={() => setEditAvatarColor(color)}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: color, border: 0, cursor: "pointer",
+                      outline: editAvatarColor === color ? `2.5px solid var(--accent)` : "2.5px solid transparent",
+                      outlineOffset: 2,
+                      transition: "transform .1s, outline .1s",
+                      transform: editAvatarColor === color ? "scale(1.15)" : "scale(1)",
+                    }}
                   />
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-1">
+            {/* Read receipts */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
               <div>
-                <p className="text-warm-800 text-sm font-medium">Read Receipts</p>
-                <p className="text-warm-500 text-xs">Let others see when you&apos;ve read their messages</p>
+                <p style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text)" }}>Read receipts</p>
+                <p style={{ fontSize: 12, color: "var(--text-faint)" }}>Let others see when you've read their messages</p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditShowReceipts(!editShowReceipts)}
-                className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
-                  editShowReceipts ? "bg-warm-800" : "bg-warm-400"
-                }`}
+                style={{
+                  width: 38, height: 20, borderRadius: 999, border: 0,
+                  background: editShowReceipts ? "var(--accent)" : "var(--border-strong)",
+                  cursor: "pointer", position: "relative", flexShrink: 0,
+                  transition: "background .2s",
+                }}
               >
-                <span
-                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                    editShowReceipts ? "translate-x-5" : "translate-x-0.5"
-                  }`}
-                />
+                <span style={{
+                  position: "absolute", top: 2, width: 16, height: 16,
+                  background: "white", borderRadius: "50%",
+                  transition: "left .2s",
+                  left: editShowReceipts ? 20 : 2,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                }} />
               </button>
             </div>
 
-            <div className="flex gap-2 pt-1">
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 8, paddingTop: 2 }}>
               <button
-                type="submit"
-                disabled={savingProfile}
-                className="flex-1 bg-warm-800 text-warm-50 rounded-xl py-2.5 text-sm font-semibold hover:bg-warm-900 disabled:opacity-50 transition-colors"
-              >
-                {savingProfile ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 bg-warm-200 text-warm-700 rounded-xl py-2.5 text-sm font-medium hover:bg-warm-300 transition-colors"
+                type="button" onClick={onClose}
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 8,
+                  border: "1px solid var(--border)", background: "transparent",
+                  color: "var(--text-muted)", fontSize: 13, fontWeight: 500,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
               >
                 Cancel
               </button>
+              <button
+                type="submit" disabled={savingProfile}
+                style={{
+                  flex: 1, padding: "9px 0", borderRadius: 8, border: 0,
+                  background: "var(--accent)", color: "white",
+                  fontSize: 13, fontWeight: 600,
+                  cursor: savingProfile ? "default" : "pointer",
+                  opacity: savingProfile ? 0.7 : 1,
+                  fontFamily: "inherit",
+                }}
+              >
+                {savingProfile ? "Saving…" : "Save changes"}
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );

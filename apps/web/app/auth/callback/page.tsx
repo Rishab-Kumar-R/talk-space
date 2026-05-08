@@ -19,8 +19,8 @@ function AuthCallbackInner() {
   }, [params, router]);
 
   return (
-    <div className="min-h-screen bg-warm-200 flex items-center justify-center">
-      <p className="text-warm-600 text-sm">Signing you in…</p>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
+      <p className="text-sm" style={{ color: "var(--text-3)" }}>Signing you in…</p>
     </div>
   );
 }

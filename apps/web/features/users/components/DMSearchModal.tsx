@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { X, Search } from "lucide-react";
 import { UserSummary } from "../../../shared/types";
 import { Avatar } from "./Avatar";
-import { StatusDot } from "./StatusDot";
 
 interface Props {
   dmQuery: string;
@@ -21,59 +21,73 @@ export function DMSearchModal({ dmQuery, setDmQuery, dmResults, onSelect, onClos
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 bg-black/25 flex items-center justify-center z-50 px-4"
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" onClick={onClose}
+      style={{ backdropFilter: "blur(12px) saturate(140%)", WebkitBackdropFilter: "blur(12px) saturate(140%)" }}>
       <div
-        className="bg-warm-50 rounded-2xl w-full max-w-sm shadow-xl overflow-hidden"
+        className="w-full max-w-sm rounded-2xl overflow-hidden"
+        style={{
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border)",
+          boxShadow: "var(--shadow-lg)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 pt-4 pb-3 border-b border-warm-300">
-          <p className="text-warm-900 font-semibold text-sm mb-3">New Direct Message</p>
-          <input
-            ref={inputRef}
-            value={dmQuery}
-            onChange={(e) => setDmQuery(e.target.value)}
-            placeholder="Search by username..."
-            className="w-full bg-warm-200 border border-warm-300 rounded-xl px-3 py-2.5 text-sm text-warm-900 outline-none focus:border-warm-600 placeholder:text-warm-500"
-          />
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3.5"
+             style={{ borderBottom: "1px solid var(--border)" }}>
+          <span className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>New Direct Message</span>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg"
+                  style={{ color: "var(--text-3)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
+            <X size={15} />
+          </button>
         </div>
+
+        {/* Search */}
+        <div className="px-3 py-3" style={{ borderBottom: "1px solid var(--border-light)" }}>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2"
+               style={{ background: "var(--bg-input)", border: "1px solid var(--border)" }}>
+            <Search size={14} style={{ color: "var(--text-3)" }} />
+            <input
+              ref={inputRef}
+              value={dmQuery}
+              onChange={(e) => setDmQuery(e.target.value)}
+              placeholder="Search by username..."
+              className="flex-1 bg-transparent text-sm outline-none"
+              style={{ color: "var(--text-1)" }}
+            />
+          </div>
+        </div>
+
+        {/* Results */}
         <div className="max-h-64 overflow-y-auto">
           {dmResults.length === 0 && dmQuery.trim() && (
-            <p className="text-warm-500 text-sm text-center py-6">No users found</p>
+            <p className="text-sm text-center py-6" style={{ color: "var(--text-3)" }}>No users found</p>
           )}
           {dmResults.length === 0 && !dmQuery.trim() && (
-            <p className="text-warm-500 text-sm text-center py-6">Type a username to search</p>
+            <p className="text-sm text-center py-6" style={{ color: "var(--text-3)" }}>Type a username to search</p>
           )}
           {dmResults.map((user) => (
             <button
               key={user.id}
               onClick={() => onSelect(user.username)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-warm-200 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3 transition-colors"
+              style={{ color: "var(--text-1)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
               <div className="relative shrink-0">
-                <Avatar name={user.username} size={34} />
-                <span className="absolute -bottom-0.5 -right-0.5">
-                  <StatusDot status={user.status ?? "available"} size={10} />
-                </span>
+                <Avatar name={user.username} size={32} />
               </div>
               <div className="text-left min-w-0">
-                <p className="text-warm-900 text-sm font-medium">{user.username}</p>
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{user.username}</p>
                 {user.statusText && (
-                  <p className="text-warm-500 text-xs truncate">{user.statusText}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>{user.statusText}</p>
                 )}
               </div>
             </button>
           ))}
-        </div>
-        <div className="px-4 py-3 border-t border-warm-300">
-          <button
-            onClick={onClose}
-            className="w-full text-warm-600 text-sm hover:text-warm-900 transition-colors"
-          >
-            Cancel
-          </button>
         </div>
       </div>
     </div>

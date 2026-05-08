@@ -1,15 +1,24 @@
 "use client";
 
+import { useRef } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
+import {
+  CornerUpLeft, MessageSquare, Smile, Pencil, Trash2, Pin, PinOff, Bookmark, BookmarkCheck,
+} from "lucide-react";
 import { Message, ReadReceipt } from "../../../shared/types";
-import { formatTime, EMOJI_OPTIONS } from "../../../shared/lib/utils";
+import { formatTime } from "../../../shared/lib/utils";
 import { Avatar } from "../../users/components/Avatar";
 import { FileMessage } from "./FileMessage";
 import { MarkdownContent } from "../../../shared/lib/markdown";
+import { EmojiPicker } from "../../../shared/components/EmojiPicker";
 
 interface Props {
   msg: Message;
   display: Message;
   username: string;
+  myAvatarColor?: string | null;
+  isGrouped?: boolean;
   editingId: string | null;
   editDraft: string;
   setEditDraft: (v: string) => void;
@@ -29,182 +38,229 @@ interface Props {
   onUnpin: (messageId: string) => void;
   onFetchReceipts: (messageId: string) => void;
   onOpenThread: (msg: Message) => void;
+  isBookmarked: boolean;
+  onBookmark: (msg: Message) => void;
 }
 
 export function MessageItem({
-  msg, display, username,
+  msg, display, username, myAvatarColor, isGrouped = false,
   editingId, editDraft, setEditDraft,
   emojiPickerFor, setEmojiPickerFor,
   currentIsDM, pinnedIds, receipts, showReadReceipts,
   onReply, onReaction, onStartEdit, onSubmitEdit, onCancelEdit,
   onDelete, onPin, onUnpin, onFetchReceipts, onOpenThread,
+  isBookmarked, onBookmark,
 }: Props) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    gsap.from(rowRef.current, { opacity: 0, y: 6, duration: 0.2, ease: "power2.out" });
+  }, []);
+
   const reactionEntries = Object.entries(display.reactions ?? {});
+  const isPinned = pinnedIds.includes(msg.id);
+  const isOwn = display.senderUsername === username;
+  const showEmoji = emojiPickerFor === msg.id;
+  const isEditing = editingId === msg.id;
+  const isMentioned = !isOwn && (display.mentions?.includes(username) ?? false);
 
   return (
-    <div key={msg.id} data-message-id={msg.id} className="flex gap-3 py-2 group relative">
-      <Avatar name={display.senderUsername} size={36} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-warm-900 text-sm font-semibold">{display.senderUsername}</span>
-          <span className="text-warm-500 text-xs">{formatTime(display.timestamp)}</span>
+    <div
+      ref={rowRef}
+      data-message-id={msg.id}
+      className={`msg-group${isGrouped ? " follow" : ""}${isMentioned ? " mentioned" : ""}`}
+    >
+      {/* Avatar / time-side for grouped */}
+      {isGrouped ? (
+        <div style={{ width: 28, flexShrink: 0, position: "relative" }}>
+          <span className="msg-time-side">
+            {formatTime(display.timestamp).replace(" AM", "").replace(" PM", "")}
+          </span>
         </div>
+      ) : (
+        <div className="msg-avatar">
+          <Avatar
+            name={display.senderUsername}
+            size={28}
+            color={isOwn && myAvatarColor ? myAvatarColor : undefined}
+            style={{ borderRadius: "50%" }}
+          />
+        </div>
+      )}
 
-        {display.replyToId && display.replyPreview && (
-          <div className="border-l-2 border-warm-500 pl-2.5 mb-1.5 py-0.5 bg-warm-200 rounded-r-md">
-            <p className="text-warm-600 text-xs truncate">{display.replyPreview}</p>
+      {/* Content */}
+      <div className="msg-body">
+        {/* Header */}
+        {!isGrouped && (
+          <div className="msg-head">
+            <span className="msg-author">{display.senderUsername}</span>
+            <span className="msg-time">
+              {formatTime(display.timestamp)}
+              {display.editedAt && !isEditing && (
+                <span className="ml-1" style={{ fontStyle: "italic" }}>(edited)</span>
+              )}
+            </span>
           </div>
         )}
 
-        {display.messageType === "image" || display.messageType === "file" ? (
-          <FileMessage msg={display} />
-        ) : editingId === msg.id ? (
+        {/* Reply quote */}
+        {display.replyToId && display.replyPreview && (
+          <div style={{ display: "flex", alignItems: "stretch", gap: 0, marginBottom: 4, maxWidth: "90%" }}>
+            <div style={{ width: 3, borderRadius: 3, background: "var(--accent)", flexShrink: 0, opacity: 0.6 }} />
+            <div style={{ paddingLeft: 8 }}>
+              {display.replyToUsername && (
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--accent)", marginRight: 5 }}>
+                  {display.replyToUsername}
+                </span>
+              )}
+              <span style={{ fontSize: 12.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {display.replyPreview}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        {isEditing ? (
           <form
             onSubmit={(e) => { e.preventDefault(); onSubmitEdit(msg.id); }}
-            className="flex items-center gap-2 mt-1"
+            style={{ display: "flex", flexDirection: "column", gap: 6 }}
           >
             <input
               autoFocus
               value={editDraft}
               onChange={(e) => setEditDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") onCancelEdit(); }}
-              className="flex-1 bg-warm-200 border border-warm-400 rounded-xl px-3 py-1.5 text-sm text-warm-900 outline-none focus:border-warm-700"
+              style={{
+                width: "100%", padding: "6px 10px",
+                fontSize: 15, lineHeight: 1.55, color: "var(--text)",
+                background: "var(--hover)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: 6, outline: "none",
+                fontFamily: "inherit",
+                boxShadow: "var(--sh-glow)",
+              }}
             />
-            <button type="submit" className="text-xs font-semibold text-warm-900 bg-warm-300 hover:bg-warm-400 px-2.5 py-1.5 rounded-lg transition-colors">Save</button>
-            <button type="button" onClick={onCancelEdit} className="text-xs text-warm-600 hover:text-warm-900 px-2 py-1.5 rounded-lg transition-colors">Cancel</button>
-          </form>
-        ) : (
-          <MarkdownContent content={display.content} />
-        )}
-
-        {display.editedAt && editingId !== msg.id && (
-          <span className="text-warm-500 text-[10px]">edited</span>
-        )}
-
-        {display.senderUsername === username && showReadReceipts && receipts[msg.id]?.length > 0 && (
-          <div
-            className="flex items-center gap-1 mt-0.5 cursor-pointer"
-            onClick={() => onFetchReceipts(msg.id)}
-          >
-            <span className="text-warm-500 text-[10px]">Seen by</span>
-            <div className="flex -space-x-1">
-              {receipts[msg.id].slice(0, 3).map((r) => (
-                <div key={r.username} title={r.username} className="ring-1 ring-warm-100 rounded-full">
-                  <Avatar name={r.username} size={14} />
-                </div>
-              ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="submit"
+                style={{
+                  padding: "3px 10px", borderRadius: 5, border: 0,
+                  background: "var(--accent)", color: "white",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >Save</button>
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                style={{
+                  padding: "3px 8px", borderRadius: 5,
+                  border: "1px solid var(--border)", background: "transparent",
+                  color: "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >Cancel</button>
+              <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: 2 }}>esc to cancel</span>
             </div>
-            {receipts[msg.id].length > 3 && (
-              <span className="text-warm-500 text-[10px]">+{receipts[msg.id].length - 3}</span>
-            )}
-          </div>
-        )}
-
-        {reactionEntries.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {reactionEntries.map(([emoji, users]) => (
-              <button
-                key={emoji}
-                onClick={(e) => { e.stopPropagation(); onReaction(msg.id, emoji); }}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-all
-                  ${users.includes(username)
-                    ? "bg-warm-300 border-warm-600 text-warm-900"
-                    : "bg-warm-50 border-warm-300 text-warm-700 hover:border-warm-500"
-                  }`}
-              >
-                {emoji} <span className="font-medium">{users.length}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!currentIsDM && (display.threadCount ?? 0) > 0 && (
-          <button
-            onClick={() => onOpenThread(display)}
-            className="flex items-center gap-1 mt-1.5 text-xs text-warm-600 hover:text-warm-900 hover:underline transition-colors"
-          >
-            <span>💬</span>
-            <span className="font-medium">{display.threadCount} {display.threadCount === 1 ? "reply" : "replies"}</span>
-          </button>
-        )}
-      </div>
-
-      <div
-        className={`flex items-start gap-0.5 shrink-0 transition-opacity ${
-          emojiPickerFor === msg.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {emojiPickerFor === msg.id ? (
-          <div className="flex gap-0.5 bg-white border border-warm-300 rounded-xl px-2 py-1.5 shadow-sm">
-            {EMOJI_OPTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => { onReaction(msg.id, emoji); setEmojiPickerFor(null); }}
-                className="hover:scale-125 transition-transform text-base leading-none p-0.5"
-              >
-                {emoji}
-              </button>
-            ))}
-            <button onClick={() => setEmojiPickerFor(null)} className="text-warm-400 hover:text-warm-700 text-xs ml-1 self-center">✕</button>
+          </form>
+        ) : display.messageType === "image" || display.messageType === "file" ? (
+          <div className="rounded-xl overflow-hidden inline-block">
+            <FileMessage msg={display} />
           </div>
         ) : (
-          <>
-            <button
-              onClick={() => onReply(display)}
-              className="text-warm-500 hover:text-warm-800 text-sm px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"
-              title="Reply"
-            >
-              ↩
-            </button>
-            {!currentIsDM && (
-              <button
-                onClick={() => onOpenThread(display)}
-                className="text-warm-500 hover:text-warm-800 text-sm px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"
-                title="Open thread"
-              >
-                💬
-              </button>
-            )}
+          <div className="msg-text">
+            <MarkdownContent content={display.content} currentUser={username} />
+          </div>
+        )}
+
+        {/* Reactions */}
+        {reactionEntries.length > 0 && (
+          <div className="reactions">
+            {reactionEntries.map(([emoji, users]) => {
+              const mine = users.includes(username);
+              return (
+                <button
+                  key={emoji}
+                  onClick={(e) => { e.stopPropagation(); onReaction(msg.id, emoji); }}
+                  className={`reaction${mine ? " mine" : ""}`}
+                >
+                  <span>{emoji}</span>
+                  <span>{users.length}</span>
+                </button>
+              );
+            })}
             <button
               onClick={() => setEmojiPickerFor(msg.id)}
-              className="text-warm-500 hover:text-warm-800 text-sm px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"
-              title="React"
+              className="reaction"
+              title="Add reaction"
             >
-              😊
+              <Smile size={12} style={{ color: "var(--text-faint)" }} />
             </button>
-            {display.senderUsername === username && (
-              <>
-                <button
-                  onClick={() => onStartEdit(display)}
-                  className="text-warm-500 hover:text-warm-800 text-xs px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"
-                  title="Edit"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => onDelete(msg.id)}
-                  className="text-warm-500 hover:text-red-600 text-xs px-1.5 py-1 rounded hover:bg-warm-200 transition-colors"
-                  title="Delete"
-                >
-                  🗑️
-                </button>
-              </>
-            )}
-            {!currentIsDM && (
-              <button
-                onClick={() => pinnedIds.includes(msg.id) ? onUnpin(msg.id) : onPin(display)}
-                className={`text-xs px-1.5 py-1 rounded hover:bg-warm-200 transition-colors ${
-                  pinnedIds.includes(msg.id) ? "text-warm-800" : "text-warm-400 hover:text-warm-800"
-                }`}
-                title={pinnedIds.includes(msg.id) ? "Unpin" : "Pin message"}
-              >
-                📌
-              </button>
-            )}
-          </>
+          </div>
+        )}
+
+        {/* Thread count */}
+        {!currentIsDM && (display.threadCount ?? 0) > 0 && (
+          <div className="thread-indicator" onClick={() => onOpenThread(display)}>
+            <div className="stack">
+              <div className="a" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+                {display.senderUsername.charAt(0).toUpperCase()}
+              </div>
+            </div>
+            <span className="count">{display.threadCount} {display.threadCount === 1 ? "reply" : "replies"}</span>
+            <span className="last">Last reply 2 min ago</span>
+          </div>
         )}
       </div>
+
+      {/* Hover action toolbar (CSS-driven via .msg-group:hover .msg-actions) */}
+      {showEmoji && (
+        <div style={{ position: "absolute", right: 0, top: "-360px", zIndex: 9999 }}>
+          <EmojiPicker
+            onSelect={(emoji) => onReaction(msg.id, emoji)}
+            onClose={() => setEmojiPickerFor(null)}
+          />
+        </div>
+      )}
+      <div className="msg-actions" onClick={(e) => e.stopPropagation()}>
+        <button title="React" onClick={() => setEmojiPickerFor(showEmoji ? null : msg.id)}>
+            <Smile size={15} />
+          </button>
+          <button title="Reply" onClick={() => onReply(display)}>
+            <CornerUpLeft size={15} />
+          </button>
+          {!currentIsDM && (
+            <button title="Reply in thread" onClick={() => onOpenThread(display)}>
+              <MessageSquare size={15} />
+            </button>
+          )}
+          <button
+            title={isBookmarked ? "Remove bookmark" : "Save message"}
+            onClick={() => onBookmark(display)}
+            style={isBookmarked ? { color: "var(--accent)" } : {}}
+          >
+            {isBookmarked ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+          </button>
+          <span className="sep" />
+          {isOwn && (
+            <button title="Edit" onClick={() => onStartEdit(display)}>
+              <Pencil size={14} />
+            </button>
+          )}
+          {!currentIsDM && (
+            <button title={isPinned ? "Unpin" : "Pin"} onClick={() => isPinned ? onUnpin(msg.id) : onPin(display)}>
+              {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+            </button>
+          )}
+          {isOwn && (
+            <button
+              title="Delete"
+              onClick={() => onDelete(msg.id)}
+              style={{ color: "var(--accent-rose)" }}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
     </div>
   );
 }
