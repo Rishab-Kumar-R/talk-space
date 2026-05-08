@@ -3,33 +3,44 @@
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useMemo } from "react";
+import hljs from "highlight.js";
 
 marked.use({ gfm: true, breaks: true });
 
 const renderer = new marked.Renderer();
 renderer.image = () => "";
+renderer.code = ({ text, lang }) => {
+  const language = lang && hljs.getLanguage(lang) ? lang : "plaintext";
+  const highlighted = hljs.highlight(text, { language }).value;
+  const label = language !== "plaintext" ? `<span class="hljs-lang-label">${language}</span>` : "";
+  return `<pre><code class="hljs language-${language}">${highlighted}</code>${label}</pre>`;
+};
 
-function highlightMentions(text: string): string {
+function highlightMentions(text: string, currentUser?: string): string {
   return text.replace(
     /@([a-zA-Z0-9._-]+)/g,
-    '<span class="mention">@$1</span>',
+    (_, user) => {
+      const isMe = currentUser && user.toLowerCase() === currentUser.toLowerCase();
+      return `<span class="mention${isMe ? " me" : ""}">@${user}</span>`;
+    },
   );
 }
 
-export function MarkdownContent({ content }: { content: string }) {
+export function MarkdownContent({ content, currentUser }: { content: string; currentUser?: string }) {
   const html = useMemo(() => {
-    const withMentions = highlightMentions(content ?? "");
+    const withMentions = highlightMentions(content ?? "", currentUser);
     const raw = marked.parse(withMentions, { renderer }) as string;
     return DOMPurify.sanitize(raw, {
       ALLOWED_TAGS: ["p", "strong", "em", "code", "pre", "a", "ul", "ol", "li", "blockquote", "br", "span"],
       ALLOWED_ATTR: ["href", "target", "rel", "class"],
       FORCE_BODY: false,
+      ALLOW_DATA_ATTR: false,
     });
-  }, [content]);
+  }, [content, currentUser]);
 
   return (
     <div
-      className="msg-content text-warm-800 text-sm leading-relaxed break-words [&_.mention]:bg-warm-300 [&_.mention]:text-warm-900 [&_.mention]:rounded [&_.mention]:px-1 [&_.mention]:font-semibold [&_.mention]:text-xs"
+      className="msg-content text-sm leading-relaxed break-words"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
