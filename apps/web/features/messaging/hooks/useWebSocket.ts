@@ -11,6 +11,7 @@ export function useWebSocket(roomId: string) {
   const [wsEvents, setWsEvents] = useState<WsEvent[]>([]);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [threadTypingUsers, setThreadTypingUsers] = useState<Record<string, string[]>>({});
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const retryCount = useRef(0);
@@ -46,16 +47,34 @@ export function useWebSocket(roomId: string) {
         const data = JSON.parse(event.data);
 
         if (data.type === "typing") {
-          const { username } = data as { username: string };
-          setTypingUsers((prev) =>
-            prev.includes(username) ? prev : [...prev, username],
-          );
-          if (typingTimers.current[username]) {
-            clearTimeout(typingTimers.current[username]);
+          const { username, threadId } = data as { username: string; threadId?: string };
+          const timerKey = threadId ? `thread:${threadId}:${username}` : username;
+
+          if (threadId) {
+            setThreadTypingUsers((prev) => {
+              const current = prev[threadId] ?? [];
+              if (current.includes(username)) return prev;
+              return { ...prev, [threadId]: [...current, username] };
+            });
+          } else {
+            setTypingUsers((prev) =>
+              prev.includes(username) ? prev : [...prev, username],
+            );
           }
-          typingTimers.current[username] = setTimeout(() => {
-            setTypingUsers((prev) => prev.filter((u) => u !== username));
-            delete typingTimers.current[username];
+
+          if (typingTimers.current[timerKey]) {
+            clearTimeout(typingTimers.current[timerKey]);
+          }
+          typingTimers.current[timerKey] = setTimeout(() => {
+            if (threadId) {
+              setThreadTypingUsers((prev) => {
+                const filtered = (prev[threadId] ?? []).filter((u) => u !== username);
+                return { ...prev, [threadId]: filtered };
+              });
+            } else {
+              setTypingUsers((prev) => prev.filter((u) => u !== username));
+            }
+            delete typingTimers.current[timerKey];
           }, 2500);
         } else if (data.type === "message") {
           const { type: _type, ...message } = data;
@@ -111,5 +130,11 @@ export function useWebSocket(roomId: string) {
     }
   }, []);
 
-  return { messages, wsEvents, threadReplies, typingUsers, connected, sendMessage, sendTyping };
+  const sendThreadTyping = useCallback((threadId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "typing", threadId }));
+    }
+  }, []);
+
+  return { messages, wsEvents, threadReplies, typingUsers, threadTypingUsers, connected, sendMessage, sendTyping, sendThreadTyping };
 }
