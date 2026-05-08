@@ -49,6 +49,7 @@ tasks.withType<Test> {
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    jvmArgs("-Djdk.tls.client.protocols=TLSv1.2,TLSv1.3", "-Djsse.enableSNIExtension=true")
     val envFile = projectDir.resolve(".env")
     if (envFile.exists()) {
         val props = envFile.readLines()

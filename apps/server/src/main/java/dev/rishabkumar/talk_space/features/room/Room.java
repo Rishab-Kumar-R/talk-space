@@ -23,6 +23,7 @@ public class Room {
     private List<String> pinnedMessageIds = new ArrayList<>();
     private boolean isPrivate = false;
     private Map<String, String> memberRoles = new HashMap<>();
+    private String description;
 
     public Room(String name, String createdBy) {
         this.name = name;
@@ -44,4 +45,6 @@ public class Room {
     public void setPrivate(boolean isPrivate) { this.isPrivate = isPrivate; }
     public Map<String, String> getMemberRoles() { return memberRoles; }
     public void setMemberRoles(Map<String, String> memberRoles) { this.memberRoles = memberRoles; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 }

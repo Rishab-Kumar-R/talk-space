@@ -16,16 +16,24 @@ public class PresenceService {
         this.redisTemplate = redisTemplate;
     }
 
+    private static final String GLOBAL_KEY = "presence.global";
+
     public Mono<Long> join(String roomId, String username) {
-        return redisTemplate.opsForSet().add(key(roomId), username);
+        return redisTemplate.opsForSet().add(key(roomId), username)
+                .then(redisTemplate.opsForSet().add(GLOBAL_KEY, username));
     }
 
     public Mono<Long> leave(String roomId, String username) {
-        return redisTemplate.opsForSet().remove(key(roomId), username);
+        return redisTemplate.opsForSet().remove(key(roomId), username)
+                .then(redisTemplate.opsForSet().remove(GLOBAL_KEY, username));
     }
 
     public Flux<String> getOnline(String roomId) {
         return redisTemplate.opsForSet().members(key(roomId));
+    }
+
+    public Flux<String> getOnlineGlobal() {
+        return redisTemplate.opsForSet().members(GLOBAL_KEY);
     }
 
     private String key(String roomId) {

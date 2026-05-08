@@ -111,9 +111,12 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                                 : Map.of("type", "message", "content", payload);
 
                         if ("typing".equals(event.get("type"))) {
-                            Map<String, String> typingEvent = new HashMap<>();
+                            Map<String, Object> typingEvent = new HashMap<>();
                             typingEvent.put("type", "typing");
                             typingEvent.put("username", username);
+                            if (event.containsKey("threadId")) {
+                                typingEvent.put("threadId", event.get("threadId"));
+                            }
                             return broadcastService.publish(roomId, Map.copyOf(typingEvent));
                         }
 

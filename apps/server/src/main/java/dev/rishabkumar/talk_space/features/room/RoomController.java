@@ -43,6 +43,11 @@ public class RoomController {
                 .flatMap(username -> roomService.create(name, isPrivate, username));
     }
 
+    @GetMapping("/presence/online")
+    public Mono<List<String>> getGlobalPresence() {
+        return presenceService.getOnlineGlobal().collectList();
+    }
+
     @GetMapping("/{roomId}/presence")
     public Mono<List<String>> getPresence(@PathVariable String roomId) {
         return presenceService.getOnline(roomId).collectList();
@@ -53,6 +58,14 @@ public class RoomController {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getName())
                 .flatMap(username -> roomService.getMembers(roomId, username));
+    }
+
+    @PatchMapping("/{roomId}")
+    public Mono<Room> updateRoom(@PathVariable String roomId, @RequestBody Map<String, String> body) {
+        String description = body.get("description");
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(username -> roomService.updateDescription(roomId, username, description));
     }
 
     @PostMapping("/{roomId}/invite")

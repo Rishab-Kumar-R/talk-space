@@ -152,6 +152,17 @@ public class RoomService {
                         }));
     }
 
+    public Mono<Room> updateDescription(String roomId, String callerUsername, String description) {
+        return roomRepository.findByName(roomId)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found")))
+                .flatMap(room -> {
+                    if (!"admin".equals(room.getMemberRoles().get(callerUsername)))
+                        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin only"));
+                    room.setDescription(description);
+                    return roomRepository.save(room);
+                });
+    }
+
     public Mono<Room> unpin(String roomId, String messageId) {
         return roomRepository.findByName(roomId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found")))
