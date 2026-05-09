@@ -2,7 +2,6 @@
 
 import { X } from "lucide-react";
 import { UserStatus } from "../../../shared/types";
-import { PROFILE_COLORS } from "../../../shared/lib/utils";
 import { Avatar } from "./Avatar";
 import { StatusDot, STATUS_LABEL } from "./StatusDot";
 
@@ -18,6 +17,10 @@ interface Props {
   setEditStatus: (v: UserStatus) => void;
   editStatusText: string;
   setEditStatusText: (v: string) => void;
+  editDndStart: string;
+  setEditDndStart: (v: string) => void;
+  editDndEnd: string;
+  setEditDndEnd: (v: string) => void;
   savingProfile: boolean;
   onSave: (e: React.FormEvent) => void;
   onClose: () => void;
@@ -36,6 +39,8 @@ export function ProfileModal({
   editShowReceipts, setEditShowReceipts,
   editStatus, setEditStatus,
   editStatusText, setEditStatusText,
+  editDndStart, setEditDndStart,
+  editDndEnd, setEditDndEnd,
   savingProfile,
   onSave,
   onClose,
@@ -137,28 +142,6 @@ export function ProfileModal({
               />
             </div>
 
-            {/* Avatar color */}
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", display: "block", marginBottom: 8 }}>
-                Avatar color
-              </label>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {PROFILE_COLORS.map((color) => (
-                  <button
-                    key={color} type="button" onClick={() => setEditAvatarColor(color)}
-                    style={{
-                      width: 28, height: 28, borderRadius: "50%",
-                      background: color, border: 0, cursor: "pointer",
-                      outline: editAvatarColor === color ? `2.5px solid var(--accent)` : "2.5px solid transparent",
-                      outlineOffset: 2,
-                      transition: "transform .1s, outline .1s",
-                      transform: editAvatarColor === color ? "scale(1.15)" : "scale(1)",
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
             {/* Read receipts */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
               <div>
@@ -183,6 +166,43 @@ export function ProfileModal({
                   boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
                 }} />
               </button>
+            </div>
+
+            {/* DND hours */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", display: "block", marginBottom: 6 }}>
+                Do Not Disturb hours
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="time"
+                  value={editDndStart}
+                  onChange={(e) => setEditDndStart(e.target.value)}
+                  style={{
+                    flex: 1, padding: "7px 10px", borderRadius: 8,
+                    border: "1px solid var(--border)", outline: "none",
+                    background: "transparent", color: "var(--text)",
+                    fontSize: 13, fontFamily: "inherit",
+                  }}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border-strong)"; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border)"; }}
+                />
+                <span style={{ fontSize: 12, color: "var(--text-faint)" }}>to</span>
+                <input
+                  type="time"
+                  value={editDndEnd}
+                  onChange={(e) => setEditDndEnd(e.target.value)}
+                  style={{
+                    flex: 1, padding: "7px 10px", borderRadius: 8,
+                    border: "1px solid var(--border)", outline: "none",
+                    background: "transparent", color: "var(--text)",
+                    fontSize: 13, fontFamily: "inherit",
+                  }}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border-strong)"; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "var(--border)"; }}
+                />
+              </div>
+              <p style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 4 }}>No notifications during these hours. Leave blank to disable.</p>
             </div>
 
             {/* Actions */}

@@ -48,7 +48,7 @@ export function useProfile() {
   }, [editDisplayName, editAvatarColor, editShowReceipts, editStatus, editStatusText]);
 
   return {
-    myProfile,
+    myProfile, setMyProfile,
     showProfile, setShowProfile,
     editDisplayName, setEditDisplayName,
     editAvatarColor, setEditAvatarColor,

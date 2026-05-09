@@ -7,6 +7,18 @@ export async function searchUsers(q: string): Promise<UserSummary[]> {
   return (await safeJson<UserSummary[]>(res)) ?? [];
 }
 
+export async function getUser(username: string): Promise<UserProfile | null> {
+  const res = await apiFetch(`${API_BASE}/users/${encodeURIComponent(username)}`);
+  if (!res.ok) return null;
+  return (await safeJson<UserProfile>(res)) ?? null;
+}
+
+export async function getMyDMs(): Promise<string[]> {
+  const res = await apiFetch(`${API_BASE}/users/me/dms`);
+  if (!res.ok) return [];
+  return (await safeJson<string[]>(res)) ?? [];
+}
+
 export async function getMe(): Promise<UserProfile | null> {
   const res = await apiFetch(`${API_BASE}/users/me`);
   if (!res.ok) return null;
