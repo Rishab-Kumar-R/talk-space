@@ -156,8 +156,6 @@ public class RoomService {
         return roomRepository.findByName(roomId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found")))
                 .flatMap(room -> {
-                    if (!"admin".equals(room.getMemberRoles().get(callerUsername)))
-                        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin only"));
                     room.setDescription(description);
                     return roomRepository.save(room);
                 });
