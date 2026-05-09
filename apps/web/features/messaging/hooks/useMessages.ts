@@ -63,6 +63,22 @@ export function useMessages(
       setHistory((prev) =>
         prev.map((m) => m.id === event.rootId ? { ...m, threadCount: (m.threadCount ?? 0) + 1 } : m),
       );
+    } else if (event.type === "reaction_updated") {
+      setHistory((prev) =>
+        prev.map((m) => m.id === event.id ? { ...m, reactions: event.reactions } : m),
+      );
+      setMessageOverrides((prev) => {
+        if (!prev[event.id]) return prev;
+        return { ...prev, [event.id]: { ...prev[event.id], reactions: event.reactions } };
+      });
+    } else if (event.type === "poll_updated") {
+      setHistory((prev) =>
+        prev.map((m) => m.id === event.id ? { ...m, pollVotes: event.pollVotes } : m),
+      );
+      setMessageOverrides((prev) => {
+        if (!prev[event.id]) return prev;
+        return { ...prev, [event.id]: { ...prev[event.id], pollVotes: event.pollVotes } };
+      });
     }
   }, [wsEvents]);
 

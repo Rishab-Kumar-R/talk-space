@@ -135,7 +135,7 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 .then();
 
         Flux<String> redisMessages = listenerContainer
-                .receive(ChannelTopic.of(channel))
+                .receive(ChannelTopic.of(channel), ChannelTopic.of("notify.user." + username))
                 .map(ReactiveSubscription.Message::getMessage);
 
         Mono<Void> outbound = session.send(
@@ -163,6 +163,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         Number fileSizeRaw = (Number) event.get("fileSize");
         String mimeType = (String) event.get("mimeType");
         String threadId = (String) event.get("threadId");
+        @SuppressWarnings("unchecked")
+        java.util.List<String> pollOptions = (java.util.List<String>) event.get("pollOptions");
 
         Message message = new Message(roomId, username, username,
                 plaintextContent.isBlank() ? null : messageService.encrypt(plaintextContent));
@@ -181,6 +183,9 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             message.setReplyPreview(plaintextReplyPreview != null
                     ? messageService.encrypt(plaintextReplyPreview) : null);
         }
+        if (pollOptions != null) {
+            message.setPollOptions(pollOptions);
+        }
 
         return messageService.save(message).flatMap(saved -> {
             try {
@@ -196,6 +201,10 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                     outEvent.put("messageType", messageType);
                 }
 
+                if (pollOptions != null) {
+                    outEvent.put("pollOptions", pollOptions);
+                    outEvent.put("pollVotes", java.util.Collections.emptyMap());
+                }
                 if (threadId != null) {
                     outEvent.put("type", "thread_reply");
                     Map<String, Object> countEvent = new HashMap<>();
@@ -207,12 +216,26 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                             .then();
                 } else {
                     outEvent.put("type", "message");
-                    return broadcastService.publish(roomId, outEvent).then();
+                    Mono<Void> broadcast = broadcastService.publish(roomId, outEvent).then();
+                    // For DMs, notify the other participant so their badge updates instantly
+                    if (roomId.startsWith("dm.")) {
+                        String partner = dmPartner(roomId, username);
+                        broadcast = broadcast.then(broadcastService.publishUnreadBump(roomId, partner).then());
+                    }
+                    return broadcast;
                 }
             } catch (Exception e) {
                 return Mono.<Void>error(e);
             }
         });
+    }
+
+    private static String dmPartner(String roomId, String self) {
+        // roomId format: dm.alice.bob (sorted)
+        for (String part : roomId.substring(3).split("\\.")) {
+            if (!part.equals(self)) return part;
+        }
+        return self;
     }
 
     private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9._-]+)");

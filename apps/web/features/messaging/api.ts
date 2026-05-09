@@ -14,6 +14,12 @@ export async function searchMessages(roomId: string, q: string): Promise<Message
   return (await safeJson<Message[]>(res)) ?? [];
 }
 
+export async function searchMessagesGlobal(q: string): Promise<Message[]> {
+  const res = await apiFetch(`${API_BASE}/messages/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) return [];
+  return (await safeJson<Message[]>(res)) ?? [];
+}
+
 export async function toggleReaction(messageId: string, emoji: string): Promise<Message> {
   const res = await apiFetch(`${API_BASE}/messages/${messageId}/reactions`, {
     method: "POST",
@@ -50,3 +56,14 @@ export async function getMentions(limit = 50): Promise<Message[]> {
   if (!res.ok) return [];
   return (await safeJson<Message[]>(res)) ?? [];
 }
+
+export async function voteOnPoll(messageId: string, optionIndex: number): Promise<Message> {
+  const res = await apiFetch(`${API_BASE}/messages/${messageId}/vote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ optionIndex }),
+  });
+  if (!res.ok) throw new Error("Failed to vote");
+  return (await safeJson<Message>(res))!;
+}
+

@@ -37,6 +37,8 @@ public class Message {
     private String fileName;
     private Long fileSize;
     private String mimeType;
+    private List<String> pollOptions;
+    private Map<String, Integer> pollVotes = new HashMap<>();
 
     public Message() {}
 
@@ -84,4 +86,8 @@ public class Message {
     public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
     public String getMimeType() { return mimeType; }
     public void setMimeType(String mimeType) { this.mimeType = mimeType; }
+    public List<String> getPollOptions() { return pollOptions; }
+    public void setPollOptions(List<String> pollOptions) { this.pollOptions = pollOptions; }
+    public Map<String, Integer> getPollVotes() { return pollVotes; }
+    public void setPollVotes(Map<String, Integer> pollVotes) { this.pollVotes = pollVotes; }
 }

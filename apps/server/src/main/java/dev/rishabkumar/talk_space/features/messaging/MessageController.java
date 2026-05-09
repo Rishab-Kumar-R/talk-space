@@ -72,4 +72,14 @@ public class MessageController {
                 .map(ctx -> ctx.getAuthentication().getName())
                 .flatMap(username -> messageService.delete(messageId, username));
     }
+
+    @PostMapping("/messages/{messageId}/vote")
+    public Mono<Message> vote(
+            @PathVariable String messageId,
+            @RequestBody Map<String, Object> body) {
+        int optionIndex = ((Number) body.get("optionIndex")).intValue();
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(username -> messageService.vote(messageId, optionIndex, username));
+    }
 }

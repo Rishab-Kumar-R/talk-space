@@ -18,11 +18,13 @@ export interface Message {
   mentions?: string[];
   threadId?: string;
   threadCount?: number;
-  messageType?: "text" | "image" | "file";
+  messageType?: "text" | "image" | "file" | "poll";
   fileUrl?: string;
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  pollOptions?: string[];
+  pollVotes?: Record<string, number>;
 }
 
 export interface Room {
@@ -73,6 +75,24 @@ export interface PublicRoomSummary {
   onlineCount: number;
   lastMessagePreview: string | null;
   lastMessageAt: string | null;
+}
+
+export interface ScheduledMessage {
+  id: string;
+  roomId: string;
+  senderUsername: string;
+  content: string;
+  messageType: string;
+  scheduledFor: string;
+  sent: boolean;
+  cancelled: boolean;
+  createdAt: string;
+}
+
+export interface NotificationPrefs {
+  mutedRooms: string[];
+  dndStart: string | null;
+  dndEnd: string | null;
 }
 
 export interface ReplyTo {

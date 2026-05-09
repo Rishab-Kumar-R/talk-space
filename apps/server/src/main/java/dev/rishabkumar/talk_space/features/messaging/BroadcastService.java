@@ -9,6 +9,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -60,11 +61,48 @@ public class BroadcastService {
         }
     }
 
+    public Mono<Long> publishReactionUpdated(Message saved) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "reaction_updated");
+            event.put("id", saved.getId());
+            event.put("reactions", saved.getReactions());
+            String json = objectMapper.writeValueAsString(event);
+            return redisTemplate.convertAndSend("chat.room." + saved.getRoomId(), json);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
     public Mono<Long> publishMessageDeleted(String messageId, String roomId) {
         try {
             String json = objectMapper.writeValueAsString(
                     Map.of("type", "message_deleted", "id", messageId, "roomId", roomId));
             return redisTemplate.convertAndSend("chat.room." + roomId, json);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    public Mono<Long> publishPollUpdated(Message saved) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "poll_updated");
+            event.put("id", saved.getId());
+            event.put("pollVotes", saved.getPollVotes());
+            String json = objectMapper.writeValueAsString(event);
+            return redisTemplate.convertAndSend("chat.room." + saved.getRoomId(), json);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    /** Pushes an unread_bump event to a specific user's personal notification channel. */
+    public Mono<Long> publishUnreadBump(String roomId, String recipientUsername) {
+        try {
+            String json = objectMapper.writeValueAsString(
+                    Map.of("type", "unread_bump", "roomId", roomId));
+            return redisTemplate.convertAndSend("notify.user." + recipientUsername, json);
         } catch (Exception e) {
             return Mono.error(e);
         }

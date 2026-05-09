@@ -2,7 +2,6 @@ package dev.rishabkumar.talk_space.features.messaging;
 
 import dev.rishabkumar.talk_space.shared.security.EncryptionService;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -65,6 +64,7 @@ public class MessageService {
                     if (users.isEmpty()) msg.getReactions().remove(emoji);
                     return messageRepository.save(msg);
                 })
+                .flatMap(saved -> broadcastService.publishReactionUpdated(saved).thenReturn(saved))
                 .map(this::decrypt);
     }
 
@@ -113,6 +113,26 @@ public class MessageService {
     public Flux<Message> getMentions(String username, int limit) {
         return messageRepository.findByMentionsContainingOrderByTimestampDesc(
                 username, PageRequest.of(0, limit))
+                .map(this::decrypt);
+    }
+
+    public Mono<Message> vote(String messageId, int optionIndex, String username) {
+        return messageRepository.findById(messageId)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
+                .flatMap(msg -> {
+                    if (!"poll".equals(msg.getMessageType()))
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not a poll"));
+                    if (msg.getPollOptions() == null || optionIndex < 0 || optionIndex >= msg.getPollOptions().size())
+                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid option"));
+                    var votes = msg.getPollVotes();
+                    if (Integer.valueOf(optionIndex).equals(votes.get(username))) {
+                        votes.remove(username); // toggle off
+                    } else {
+                        votes.put(username, optionIndex);
+                    }
+                    return messageRepository.save(msg);
+                })
+                .flatMap(saved -> broadcastService.publishPollUpdated(saved).thenReturn(saved))
                 .map(this::decrypt);
     }
 

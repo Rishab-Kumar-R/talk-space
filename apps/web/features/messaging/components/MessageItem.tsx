@@ -10,8 +10,8 @@ import { Message, ReadReceipt } from "../../../shared/types";
 import { formatTime } from "../../../shared/lib/utils";
 import { Avatar } from "../../users/components/Avatar";
 import { FileMessage } from "./FileMessage";
+import { PollMessage } from "./PollMessage";
 import { MarkdownContent } from "../../../shared/lib/markdown";
-import { EmojiPicker } from "../../../shared/components/EmojiPicker";
 
 interface Props {
   msg: Message;
@@ -40,6 +40,7 @@ interface Props {
   onOpenThread: (msg: Message) => void;
   isBookmarked: boolean;
   onBookmark: (msg: Message) => void;
+  onVoted: (updated: Message) => void;
 }
 
 export function MessageItem({
@@ -49,9 +50,10 @@ export function MessageItem({
   currentIsDM, pinnedIds, receipts, showReadReceipts,
   onReply, onReaction, onStartEdit, onSubmitEdit, onCancelEdit,
   onDelete, onPin, onUnpin, onFetchReceipts, onOpenThread,
-  isBookmarked, onBookmark,
+  isBookmarked, onBookmark, onVoted,
 }: Props) {
   const rowRef = useRef<HTMLDivElement>(null);
+  const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢"];
 
   useGSAP(() => {
     gsap.from(rowRef.current, { opacity: 0, y: 6, duration: 0.2, ease: "power2.out" });
@@ -162,6 +164,8 @@ export function MessageItem({
               <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: 2 }}>esc to cancel</span>
             </div>
           </form>
+        ) : display.messageType === "poll" ? (
+          <PollMessage msg={display} username={username} onVoted={onVoted} />
         ) : display.messageType === "image" || display.messageType === "file" ? (
           <div className="rounded-xl overflow-hidden inline-block">
             <FileMessage msg={display} />
@@ -212,19 +216,27 @@ export function MessageItem({
         )}
       </div>
 
-      {/* Hover action toolbar (CSS-driven via .msg-group:hover .msg-actions) */}
-      {showEmoji && (
-        <div style={{ position: "absolute", right: 0, top: "-360px", zIndex: 9999 }}>
-          <EmojiPicker
-            onSelect={(emoji) => onReaction(msg.id, emoji)}
-            onClose={() => setEmojiPickerFor(null)}
-          />
-        </div>
-      )}
       <div className="msg-actions" onClick={(e) => e.stopPropagation()}>
+        {/* Quick reaction strip */}
+        {showEmoji && (
+          <div style={{ display: "flex", alignItems: "center", gap: 2, marginRight: 4 }}>
+            {QUICK_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                title={emoji}
+                onClick={() => { onReaction(msg.id, emoji); setEmojiPickerFor(null); }}
+                style={{ fontSize: 15, lineHeight: 1, background: "transparent", border: 0, cursor: "pointer", padding: "2px 3px", borderRadius: 5 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--hover)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
         <button title="React" onClick={() => setEmojiPickerFor(showEmoji ? null : msg.id)}>
-            <Smile size={15} />
-          </button>
+          <Smile size={15} />
+        </button>
           <button title="Reply" onClick={() => onReply(display)}>
             <CornerUpLeft size={15} />
           </button>
@@ -241,7 +253,7 @@ export function MessageItem({
             {isBookmarked ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
           </button>
           <span className="sep" />
-          {isOwn && (
+          {isOwn && display.messageType !== "poll" && (
             <button title="Edit" onClick={() => onStartEdit(display)}>
               <Pencil size={14} />
             </button>
