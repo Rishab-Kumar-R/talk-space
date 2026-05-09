@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { searchMessages } from "../../messaging/api";
+import { searchMessages, searchMessagesGlobal } from "../../messaging/api";
 import { Message, Room } from "../../../shared/types";
+
+export type SearchScope = "room" | "all";
 
 export function useSearch(activeRoom: Room | null) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Message[]>([]);
   const [searching, setSearching] = useState(false);
+  const [scope, setScope] = useState<SearchScope>("room");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -18,15 +21,20 @@ export function useSearch(activeRoom: Room | null) {
   }, [activeRoom]);
 
   useEffect(() => {
-    if (!searchQuery.trim() || !activeRoom) { setSearchResults([]); return; }
+    const trimmed = searchQuery.trim();
+    if (!trimmed || (scope === "room" && !activeRoom)) {
+      setSearchResults([]);
+      return;
+    }
     setSearching(true);
     const t = setTimeout(() => {
-      searchMessages(activeRoom.name, searchQuery.trim())
-        .then(setSearchResults)
-        .finally(() => setSearching(false));
+      const req = scope === "all"
+        ? searchMessagesGlobal(trimmed)
+        : searchMessages(activeRoom!.name, trimmed);
+      req.then(setSearchResults).finally(() => setSearching(false));
     }, 400);
     return () => clearTimeout(t);
-  }, [searchQuery, activeRoom]);
+  }, [searchQuery, activeRoom, scope]);
 
   const openSearch = () => {
     setShowSearch(true);
@@ -44,6 +52,7 @@ export function useSearch(activeRoom: Room | null) {
     searchQuery, setSearchQuery,
     searchResults,
     searching,
+    scope, setScope,
     searchInputRef,
     openSearch,
     closeSearch,
