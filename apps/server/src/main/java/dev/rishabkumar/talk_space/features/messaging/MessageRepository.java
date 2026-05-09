@@ -16,6 +16,7 @@ public interface MessageRepository extends ReactiveMongoRepository<Message, Stri
     Flux<Message> findByRoomIdOrderByTimestampDesc(String roomId, Pageable pageable);
     Flux<Message> findByRoomIdOrderByTimestampDesc(String roomId);
     Mono<Long> countByRoomIdAndTimestampAfter(String roomId, Instant after);
+    Mono<Long> countByRoomIdAndTimestampAfterAndDeletedFalseAndThreadIdIsNull(String roomId, Instant after);
     Mono<Message> findFirstByRoomIdOrderByTimestampDesc(String roomId);
     Flux<Message> findByMentionsContainingOrderByTimestampDesc(String username, Pageable pageable);
     Flux<Message> findByThreadIdOrderByTimestampAsc(String threadId);
