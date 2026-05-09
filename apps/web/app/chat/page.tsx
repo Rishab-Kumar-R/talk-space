@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Hash, Search, Pin, Settings, Menu, MessageCircle, Compass, Bookmark,
+  Hash, Search, Pin, Settings, Menu, MessageCircle, Compass, Bookmark, Clock,
 } from "lucide-react";
 
 import { useWebSocket } from "../../features/messaging/hooks/useWebSocket";
@@ -20,6 +20,8 @@ import { useSearch } from "../../features/search/hooks/useSearch";
 import { useReadReceipts } from "../../features/read-receipts/hooks/useReadReceipts";
 import { useUpload } from "../../features/upload/hooks/useUpload";
 import { useNotifications } from "../../features/notifications/hooks/useNotifications";
+import { useNotificationPrefs } from "../../features/notifications/hooks/useNotificationPrefs";
+import { useScheduled } from "../../features/scheduling/hooks/useScheduled";
 
 import type { Section } from "../../features/layout/components/Sidebar";
 import { Sidebar } from "../../features/layout/components/Sidebar";
@@ -32,16 +34,18 @@ import { ThreadPanel } from "../../features/messaging/components/ThreadPanel";
 import { PinnedPanel } from "../../features/pinning/components/PinnedPanel";
 import { BookmarksPanel } from "../../features/bookmarks/components/BookmarksPanel";
 import { PinLimitModal } from "../../features/pinning/components/PinLimitModal";
+import { ScheduledPanel } from "../../features/scheduling/components/ScheduledPanel";
+import { CreatePollModal } from "../../features/messaging/components/CreatePollModal";
 import { ProfileModal } from "../../features/users/components/ProfileModal";
 import { DMSearchModal } from "../../features/users/components/DMSearchModal";
 import { Avatar } from "../../features/users/components/Avatar";
 import { StatusDot } from "../../features/users/components/StatusDot";
 
 import { toggleReaction, editMessage, deleteMessage } from "../../features/messaging/api";
-import { searchUsers, updateProfile } from "../../features/users/api";
-import { updateRoomDescription } from "../../features/rooms/api";
+import { searchUsers, updateProfile, getMyDMs } from "../../features/users/api";
+import { MemberHoverCard } from "../../features/users/components/MemberHoverCard";
 
-import { Room, ReplyTo, UserSummary } from "../../shared/types";
+import { Room, ReplyTo, UserSummary, UserStatus } from "../../shared/types";
 import { isDM, dmPartner, buildDMRoomId, typingText } from "../../shared/lib/utils";
 
 function readUsername(): string {
@@ -59,7 +63,7 @@ function readActiveDMs(): string[] {
   catch { return []; }
 }
 
-type RightPanel = "thread" | "pinned" | "search" | "bookmarks" | null;
+type RightPanel = "thread" | "pinned" | "search" | "bookmarks" | "scheduled" | null;
 
 export default function ChatPage() {
   const router = useRouter();
@@ -78,6 +82,8 @@ export default function ChatPage() {
   const [rightPanel, setRightPanel] = useState<RightPanel>(null);
   const [unreadBanner, setUnreadBanner] = useState(0);
   const isAtBottomRef = useRef(true);
+  const [hoveredMember, setHoveredMember] = useState<{ username: string; rect: DOMRect } | null>(null);
+  const [showPollModal, setShowPollModal] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -113,14 +119,28 @@ export default function ChatPage() {
     profile.myProfile?.showReadReceipts ?? false,
     thread.threadMessages, [], username, threadStreamRef,
   );
-  const { notify } = useNotifications();
+  const notifPrefs = useNotificationPrefs();
+  const { notify } = useNotifications(notifPrefs.isRoomMuted, notifPrefs.isDndActive);
+  const scheduled = useScheduled();
   const upload = useUpload((payload) => sendMessage("", undefined, undefined, payload));
   const roomMembers = useRoomMembers(activeRoom, username);
 
   useEffect(() => {
-    setUsername(readUsername());
-    setActiveDMs(readActiveDMs());
-  }, []);
+    const u = readUsername();
+    setUsername(u);
+    const localDMs = readActiveDMs();
+    setActiveDMs(localDMs);
+    profile.loadProfile();
+    scheduled.load();
+    // Sync DMs from server so recipients see conversations started by others
+    getMyDMs().then((serverDMs) => {
+      const merged = [...new Set([...localDMs, ...serverDMs])];
+      if (merged.length !== localDMs.length) {
+        setActiveDMs(merged);
+        localStorage.setItem("talkspace_dms", JSON.stringify(merged));
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -145,6 +165,7 @@ export default function ChatPage() {
         notify(
           isMentioned ? `${last.senderUsername} mentioned you` : last.senderUsername,
           last.content,
+          activeRoom.name,
         );
       }
       if (isMentioned) {
@@ -160,6 +181,15 @@ export default function ChatPage() {
     }
   }, [messages, activeRoom, username, notify, rooms.setMentionCounts]);
 
+  // Handle unread_bump events pushed from the server via the personal notify channel
+  useEffect(() => {
+    const bump = wsEvents.findLast?.((e) => e.type === "unread_bump");
+    if (!bump || bump.type !== "unread_bump") return;
+    const { roomId } = bump;
+    if (activeRoom?.name === roomId) return; // already in that room
+    rooms.setUnreadCounts((prev) => ({ ...prev, [roomId]: (prev[roomId] ?? 0) + 1 }));
+  }, [wsEvents]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function openRightPanel(panel: RightPanel) {
     if (panel !== "thread") thread.closeThread();
     if (panel !== "pinned") pinning.setShowPinned(false);
@@ -174,7 +204,7 @@ export default function ChatPage() {
     setRightPanel(null);
   }
 
-  function handleRightPanelToggle(panel: "pinned" | "search" | "bookmarks") {
+  function handleRightPanelToggle(panel: "pinned" | "search" | "bookmarks" | "scheduled") {
     if (rightPanel === panel) { closeRightPanel(); return; }
     openRightPanel(panel);
     if (panel === "search") setTimeout(() => search.searchInputRef.current?.focus(), 50);
@@ -216,19 +246,15 @@ export default function ChatPage() {
     setSidebarOpen(true);
   }
 
-  async function handleCommand(cmd: string, arg: string) {
+  async function handleStatusSave(status: UserStatus, statusText: string) {
     const p = profile.myProfile;
-    switch (cmd) {
-      case "active":
-        if (p) await updateProfile(p.displayName ?? "", p.avatarColor ?? "", p.showReadReceipts ?? false, "available", p.statusText ?? "");
-        break;
-      case "away":
-        if (p) await updateProfile(p.displayName ?? "", p.avatarColor ?? "", p.showReadReceipts ?? false, "away", p.statusText ?? "");
-        break;
-      case "dnd":
-        if (p) await updateProfile(p.displayName ?? "", p.avatarColor ?? "", p.showReadReceipts ?? false, "dnd", p.statusText ?? "");
-        break;
-    }
+    if (!p) return;
+    const updated = await updateProfile(p.displayName ?? "", p.avatarColor ?? "", p.showReadReceipts ?? false, status, statusText);
+    profile.setMyProfile(updated);
+  }
+
+  function handleCommand(cmd: string, _arg: string) {
+    if (cmd === "poll" && activeRoom) setShowPollModal(true);
   }
 
   function handleSend(e: React.FormEvent) {
@@ -256,11 +282,6 @@ export default function ChatPage() {
           if (arg && profile.myProfile) {
             const p = profile.myProfile;
             updateProfile(p.displayName ?? "", p.avatarColor ?? "", p.showReadReceipts ?? false, p.status ?? "available", arg);
-          }
-          setInput(""); return;
-        case "topic":
-          if (arg && activeRoom) {
-            updateRoomDescription(activeRoom.name, arg).then(updateRoom);
           }
           setInput(""); return;
         default:
@@ -353,7 +374,10 @@ export default function ChatPage() {
         setCreateError={rooms.setCreateError}
         onCreateRoom={rooms.handleCreateRoom}
         onRoomSelect={handleRoomSelect}
+        mutedRooms={notifPrefs.prefs.mutedRooms}
+        onToggleMute={notifPrefs.toggleMute}
         onOpenProfile={profile.openProfile}
+        onStatusSave={handleStatusSave}
         onLogout={() => {
           localStorage.removeItem("token");
           localStorage.removeItem("talkspace_dms");
@@ -398,6 +422,30 @@ export default function ChatPage() {
           {/* Actions */}
           <button
             className="icon-btn"
+            title={scheduled.pendingCount > 0 ? `Scheduled (${scheduled.pendingCount})` : "Scheduled messages"}
+            onClick={() => handleRightPanelToggle("scheduled")}
+            style={{
+              position: "relative",
+              ...(rightPanel === "scheduled" ? { background: "var(--hover)", color: "var(--accent)" } : {}),
+            }}
+          >
+            <Clock size={16} strokeWidth={1.75} />
+            {scheduled.pendingCount > 0 && (
+              <span style={{
+                position: "absolute", top: 1, right: 1,
+                minWidth: 14, height: 14, borderRadius: 99,
+                background: "var(--accent)", color: "white",
+                fontSize: 9, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                border: "1.5px solid var(--panel)",
+                padding: "0 2px",
+              }}>
+                {scheduled.pendingCount > 9 ? "9+" : scheduled.pendingCount}
+              </span>
+            )}
+          </button>
+          <button
+            className="icon-btn"
             title="Saved messages"
             onClick={() => handleRightPanelToggle("bookmarks")}
             style={rightPanel === "bookmarks" ? { background: "var(--hover)", color: "var(--accent)" } : {}}
@@ -410,7 +458,12 @@ export default function ChatPage() {
               {!currentIsDM && onlineUsers.length > 0 && (
                 <div className="flex -space-x-1.5">
                   {onlineUsers.slice(0, 4).map((u) => (
-                    <div key={u} style={{ border: "2px solid var(--panel)", borderRadius: "50%" }}>
+                    <div
+                      key={u}
+                      style={{ border: "2px solid var(--panel)", borderRadius: "50%", cursor: "default" }}
+                      onMouseEnter={(e) => setHoveredMember({ username: u, rect: e.currentTarget.getBoundingClientRect() })}
+                      onMouseLeave={() => setHoveredMember(null)}
+                    >
                       <Avatar name={u} size={24} />
                     </div>
                   ))}
@@ -533,6 +586,7 @@ export default function ChatPage() {
                     onOpenThread={(m) => { thread.openThread(m); openRightPanel("thread"); }}
                     isBookmarked={bookmarks.isBookmarked(msg.id, bookmarks.bookmarks)}
                     onBookmark={(m) => bookmarks.toggle(m, activeRoom)}
+                    onVoted={(updated) => msgs.applyReaction(updated.id, updated)}
                   />
                 );
               })}
@@ -594,6 +648,11 @@ export default function ChatPage() {
                   ? `Message ${dmPartner(activeRoom.name, username)}`
                   : activeRoom ? `Message #${activeRoom.name}` : "Select a channel…"
               }
+              onSchedule={activeRoom ? (iso) => {
+                if (!input.trim()) return;
+                scheduled.schedule(activeRoom.name, input.trim(), iso);
+              } : undefined}
+              onCreatePoll={activeRoom ? () => setShowPollModal(true) : undefined}
             />
           </div>
 
@@ -629,6 +688,17 @@ export default function ChatPage() {
               onClose={closeRightPanel}
             />
           )}
+          {rightPanel === "scheduled" && (
+            <ScheduledPanel
+              scheduled={scheduled.scheduled}
+              loading={scheduled.loading}
+              username={username}
+              onLoad={scheduled.load}
+              onCancel={scheduled.cancel}
+              onReschedule={scheduled.reschedule}
+              onClose={closeRightPanel}
+            />
+          )}
         </div>
         </div>{/* end card inner */}
         </div>{/* end card */}
@@ -658,7 +728,14 @@ export default function ChatPage() {
           setSearchQuery={search.setSearchQuery}
           searchResults={search.searchResults}
           searching={search.searching}
+          scope={search.scope}
+          setScope={search.setScope}
+          activeRoomName={activeRoom?.name}
           searchInputRef={search.searchInputRef}
+          onResultClick={(msg) => {
+            const room = rooms.rooms.find((r) => r.name === msg.roomId);
+            if (room) handleRoomSelect(room);
+          }}
           onClose={closeRightPanel}
         />
       )}
@@ -677,8 +754,16 @@ export default function ChatPage() {
           setEditStatus={profile.setEditStatus}
           editStatusText={profile.editStatusText}
           setEditStatusText={profile.setEditStatusText}
+          editDndStart={notifPrefs.editDndStart}
+          setEditDndStart={notifPrefs.setEditDndStart}
+          editDndEnd={notifPrefs.editDndEnd}
+          setEditDndEnd={notifPrefs.setEditDndEnd}
           savingProfile={profile.savingProfile}
-          onSave={(e) => { e.preventDefault(); profile.saveProfile(); }}
+          onSave={(e) => {
+            e.preventDefault();
+            profile.saveProfile();
+            notifPrefs.saveDnd(notifPrefs.editDndStart, notifPrefs.editDndEnd);
+          }}
           onClose={() => profile.setShowProfile(false)}
         />
       )}
@@ -727,6 +812,17 @@ export default function ChatPage() {
           pinnedMessages={pinning.pinnedMessages}
           onConfirm={pinning.confirmPin}
           onCancel={() => pinning.setPendingPin(null)}
+        />
+      )}
+      {hoveredMember && (
+        <MemberHoverCard username={hoveredMember.username} anchorRect={hoveredMember.rect} />
+      )}
+      {showPollModal && activeRoom && (
+        <CreatePollModal
+          onCreate={(question, options) => {
+            sendMessage(question, undefined, undefined, { messageType: "poll", pollOptions: options });
+          }}
+          onClose={() => setShowPollModal(false)}
         />
       )}
     </div>

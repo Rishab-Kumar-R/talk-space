@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Hash, Lock, Plus, X, Search, ChevronDown, LogOut,
-  Sun, Moon, PenSquare,
+  Sun, Moon, PenSquare, BellOff,
 } from "lucide-react";
-import { Room, UserProfile } from "../../../shared/types";
+import { Room, UserProfile, UserStatus } from "../../../shared/types";
 import { isDM, dmPartner } from "../../../shared/lib/utils";
 import { Avatar } from "../../users/components/Avatar";
-import { STATUS_LABEL } from "../../users/components/StatusDot";
+import { StatusDot, STATUS_LABEL } from "../../users/components/StatusDot";
+import { StatusPickerPopover } from "../../users/components/StatusPickerPopover";
 import { useTheme } from "../../../shared/hooks/useTheme";
 
 export type Section = "rooms" | "dms" | "browse";
@@ -33,8 +34,11 @@ interface Props {
   createError: string;
   setCreateError: (v: string) => void;
   onCreateRoom: (e: React.FormEvent) => void;
+  mutedRooms: string[];
+  onToggleMute: (roomId: string) => void;
   onRoomSelect: (room: Room) => void;
   onOpenProfile: () => void;
+  onStatusSave: (status: UserStatus, text: string) => Promise<void>;
   onLogout: () => void;
   onNewDM: () => void;
   onOpenSearch: () => void;
@@ -48,13 +52,35 @@ export function Sidebar(props: Props) {
     rooms, activeRoom, activeDMs, username, myProfile, connected,
     unreadCounts, mentionCounts, onlineGlobal, newRoomName, setNewRoomName, newRoomPrivate, setNewRoomPrivate,
     showCreateRoom, setShowCreateRoom, createError, setCreateError,
-    onCreateRoom, onRoomSelect, onOpenProfile, onLogout, onNewDM, onOpenSearch,
+    onCreateRoom, onRoomSelect, onOpenProfile, onStatusSave, onLogout, onNewDM, onOpenSearch,
+    mutedRooms, onToggleMute,
     open, onClose,
   } = props;
 
   const { theme, toggleTheme } = useTheme();
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [dmsOpen, setDmsOpen] = useState(true);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ roomId: string; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (!showStatusPicker) return;
+    function handleClick(e: MouseEvent) {
+      if (footerRef.current && !footerRef.current.contains(e.target as Node)) {
+        setShowStatusPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showStatusPicker]);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    function handleClick() { setCtxMenu(null); }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [ctxMenu]);
 
   const channelRooms = rooms.filter((r) => !isDM(r.name));
 
@@ -119,16 +145,22 @@ export function Sidebar(props: Props) {
                   const unread = unreadCounts[room.name] ?? 0;
                   const mentions = mentionCounts[room.name] ?? 0;
                   const active = activeRoom?.id === room.id;
+                  const muted = mutedRooms.includes(room.name);
                   return (
                     <button
                       key={room.id}
                       className={`n-item${active ? " active" : ""}${unread > 0 && !active ? " unread" : ""}`}
                       onClick={() => { onRoomSelect(room); onClose(); }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setCtxMenu({ roomId: room.name, x: e.clientX, y: e.clientY });
+                      }}
                     >
                       <span className="n-item-icon">{room.isPrivate ? <Lock size={12} /> : <Hash size={12} />}</span>
                       <span className="n-item-label">{room.name}</span>
-                      {mentions > 0 && !active && <span className="n-badge mention-badge">@{mentions}</span>}
-                      {unread > 0 && !active && mentions === 0 && <span className="n-badge">{unread > 99 ? "99+" : unread}</span>}
+                      {muted && !active && <BellOff size={11} style={{ color: "var(--text-faint)", flexShrink: 0 }} />}
+                      {mentions > 0 && !active && !muted && <span className="n-badge mention-badge">@{mentions}</span>}
+                      {unread > 0 && !active && mentions === 0 && !muted && <span className="n-badge">{unread > 99 ? "99+" : unread}</span>}
                     </button>
                   );
                 })}
@@ -197,7 +229,15 @@ export function Sidebar(props: Props) {
         </div>
 
         {/* ── User footer ──────────────────────────────── */}
-        <div className="n-footer">
+        <div className="n-footer" ref={footerRef} style={{ position: "relative" }}>
+          {showStatusPicker && (
+            <StatusPickerPopover
+              status={myProfile?.status ?? "available"}
+              statusText={myProfile?.statusText ?? ""}
+              onSave={onStatusSave}
+              onClose={() => setShowStatusPicker(false)}
+            />
+          )}
           <button className="n-user-btn" onClick={onOpenProfile}>
             {username && <Avatar name={username} size={22} color={myProfile?.avatarColor ?? undefined} style={{ borderRadius: 5, flexShrink: 0 }} />}
             <div className="n-user-info">
@@ -207,12 +247,49 @@ export function Sidebar(props: Props) {
               </span>
             </div>
           </button>
+          <button
+            className="n-action-btn"
+            title="Set status"
+            onClick={() => setShowStatusPicker((v) => !v)}
+          >
+            <StatusDot status={myProfile?.status ?? "available"} size={8} />
+          </button>
           <button className="n-action-btn" onClick={onLogout} title="Sign out">
             <LogOut size={14} />
           </button>
         </div>
 
       </aside>
+
+      {/* Room context menu */}
+      {ctxMenu && (
+        <div
+          style={{
+            position: "fixed", top: ctxMenu.y, left: ctxMenu.x, zIndex: 200,
+            background: "var(--panel)", border: "1px solid var(--border)",
+            borderRadius: 8, boxShadow: "var(--sh-4)",
+            padding: "4px",
+            minWidth: 160,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => { onToggleMute(ctxMenu.roomId); setCtxMenu(null); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              width: "100%", padding: "7px 10px", borderRadius: 6,
+              background: "transparent", border: 0, cursor: "pointer",
+              color: "var(--text)", fontSize: 13, fontFamily: "inherit",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--hover)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            <BellOff size={13} style={{ color: "var(--text-faint)" }} />
+            {mutedRooms.includes(ctxMenu.roomId) ? "Unmute notifications" : "Mute notifications"}
+          </button>
+        </div>
+      )}
     </>
   );
 }

@@ -4,7 +4,10 @@ import { Message } from "../../../shared/types";
 export type WsEvent =
   | { type: "message_edited"; id: string; content: string; editedAt: string }
   | { type: "message_deleted"; id: string }
-  | { type: "thread_count_updated"; rootId: string };
+  | { type: "thread_count_updated"; rootId: string }
+  | { type: "reaction_updated"; id: string; reactions: Record<string, string[]> }
+  | { type: "unread_bump"; roomId: string }
+  | { type: "poll_updated"; id: string; pollVotes: Record<string, number> };
 
 export function useWebSocket(roomId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,22 +19,23 @@ export function useWebSocket(roomId: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const retryCount = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const destroyed = useRef(false);
+  const genRef = useRef(0);
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    destroyed.current = false;
+    const gen = genRef.current;
     retryCount.current = 0;
     setMessages([]);
     setWsEvents([]);
     setTypingUsers([]);
+    setThreadReplies([]);
 
     if (!roomId) return;
     const token = localStorage.getItem("token");
     if (!token) return;
 
     function connect() {
-      if (destroyed.current) return;
+      if (genRef.current !== gen) return;
 
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
       const wsBase = apiBase.replace(/^http/, "ws");
@@ -44,6 +48,7 @@ export function useWebSocket(roomId: string) {
       };
 
       ws.onmessage = (event) => {
+        if (genRef.current !== gen) return;
         const data = JSON.parse(event.data);
 
         if (data.type === "typing") {
@@ -82,14 +87,18 @@ export function useWebSocket(roomId: string) {
         } else if (data.type === "thread_reply") {
           const { type: _type, ...message } = data;
           setThreadReplies((prev) => [...prev, message as Message]);
-        } else if (data.type === "message_edited" || data.type === "message_deleted" || data.type === "thread_count_updated") {
+        } else if (
+          data.type === "message_edited" || data.type === "message_deleted" ||
+          data.type === "thread_count_updated" || data.type === "reaction_updated" ||
+          data.type === "unread_bump" || data.type === "poll_updated"
+        ) {
           setWsEvents((prev) => [...prev, data as WsEvent]);
         }
       };
 
       ws.onclose = () => {
         setConnected(false);
-        if (destroyed.current) return;
+        if (genRef.current !== gen) return;
         const delay = Math.min(1000 * 2 ** retryCount.current, 30000);
         retryCount.current += 1;
         retryTimer.current = setTimeout(connect, delay);
@@ -99,7 +108,7 @@ export function useWebSocket(roomId: string) {
     connect();
 
     return () => {
-      destroyed.current = true;
+      genRef.current++;
       if (retryTimer.current) clearTimeout(retryTimer.current);
       Object.values(typingTimers.current).forEach(clearTimeout);
       typingTimers.current = {};
@@ -112,12 +121,12 @@ export function useWebSocket(roomId: string) {
       content: string,
       replyToId?: string,
       replyPreview?: string,
-      filePayload?: { fileUrl: string; fileName: string; fileSize: number; mimeType: string; messageType: "image" | "file" },
+      extraPayload?: Record<string, unknown>,
       threadId?: string,
     ) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
-          JSON.stringify({ type: "message", content, replyToId, replyPreview, threadId, ...filePayload }),
+          JSON.stringify({ type: "message", content, replyToId, replyPreview, threadId, ...extraPayload }),
         );
       }
     },
