@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Paperclip, ArrowUp, Bold, Italic, Code, Code2, Link, List, AtSign, Smile, X, CornerDownLeft } from "lucide-react";
+import { Paperclip, ArrowUp, Bold, Italic, Code, Code2, Link, List, AtSign, Smile, X, CornerDownLeft, Clock, BarChart2 } from "lucide-react";
 import { ReplyTo, UserSummary } from "../../../shared/types";
 import { applyFormat } from "../../../shared/lib/markdown";
 import { searchUsers } from "../../users/api";
 import { Avatar } from "../../users/components/Avatar";
 import { EmojiPicker } from "../../../shared/components/EmojiPicker";
+import { SchedulePickerPopover } from "../../scheduling/components/SchedulePickerPopover";
 import data from "@emoji-mart/data";
 
 interface Props {
@@ -22,18 +23,15 @@ interface Props {
   onFileSelect: (file: File) => void;
   onPaste: (e: React.ClipboardEvent) => void;
   placeholder: string;
+  onSchedule?: (isoString: string) => void;
+  onCreatePoll?: () => void;
 }
 
 type SlashCmd = { name: string; hint: string; description: string; args: boolean };
 const SLASH_COMMANDS: SlashCmd[] = [
-  { name: "active",  hint: "",           description: "Set your status to Active",        args: false },
-  { name: "away",    hint: "",           description: "Set your status to Away",           args: false },
-  { name: "dnd",     hint: "",           description: "Set status to Do Not Disturb",      args: false },
+  { name: "poll",    hint: "",           description: "Create a poll",                     args: false },
   { name: "status",  hint: "<message>",  description: "Update your status message",        args: true  },
   { name: "dm",      hint: "<username>", description: "Open a direct message",             args: true  },
-  { name: "topic",   hint: "<text>",     description: "Set this channel's description",    args: true  },
-  { name: "shrug",   hint: "",           description: "Send ¯\\_(ツ)_/¯",                 args: false },
-  { name: "me",      hint: "<action>",   description: "Send italic action text",           args: true  },
 ];
 
 const TOOLBAR_BTNS = [
@@ -77,7 +75,7 @@ function searchEmojis(query: string): EmojiMatch[] {
 export function MessageInput({
   input, setInput, replyTo, onClearReply,
   onSend, onCommand, onTyping, uploading, uploadError,
-  onFileSelect, onPaste, placeholder,
+  onFileSelect, onPaste, placeholder, onSchedule, onCreatePoll,
 }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -91,6 +89,7 @@ export function MessageInput({
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiPickerPos, setEmojiPickerPos] = useState({ top: 0, left: 0 });
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
 
   useEffect(() => {
     if (!input) {
@@ -418,6 +417,16 @@ export function MessageInput({
           }}
         />
 
+        {/* Schedule picker popover */}
+        {showSchedulePicker && onSchedule && (
+          <div style={{ position: "relative" }}>
+            <SchedulePickerPopover
+              onSchedule={(iso) => { onSchedule(iso); setInput(""); }}
+              onClose={() => setShowSchedulePicker(false)}
+            />
+          </div>
+        )}
+
         {/* Footer */}
         <div className="composer-foot">
           <input
@@ -430,6 +439,27 @@ export function MessageInput({
           <button type="button" title="Attach file" disabled={uploading} className="icon-btn" onClick={() => fileRef.current?.click()}>
             <Paperclip size={15} strokeWidth={1.75} />
           </button>
+          {onCreatePoll && (
+            <button
+              type="button"
+              title="Create poll"
+              className="icon-btn"
+              onClick={onCreatePoll}
+            >
+              <BarChart2 size={15} strokeWidth={1.75} />
+            </button>
+          )}
+          {onSchedule && (
+            <button
+              type="button"
+              title="Schedule message"
+              className="icon-btn"
+              onClick={() => setShowSchedulePicker((v) => !v)}
+              style={showSchedulePicker ? { color: "var(--accent)" } : {}}
+            >
+              <Clock size={15} strokeWidth={1.75} />
+            </button>
+          )}
           <span className="hint" style={{ display: "flex", alignItems: "center", gap: 3 }}>
             <CornerDownLeft size={11} strokeWidth={2} /> send
             <span style={{ margin: "0 3px", opacity: 0.4 }}>·</span>
