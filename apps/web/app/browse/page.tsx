@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Hash, Search, Users, ArrowRight } from "lucide-react";
 import { getPublicRooms } from "../../features/rooms/api";
 import { PublicRoomSummary } from "../../shared/types";
@@ -46,8 +47,8 @@ export default function BrowsePage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div
-              className="w-9 h-9 rounded-[11px] flex items-center justify-center text-sm font-bold text-white"
-              style={{ background: "var(--ai-grad)", boxShadow: "var(--sh-1)" }}
+              className="w-9 h-9 rounded-[9px] flex items-center justify-center text-sm font-bold"
+              style={{ background: "var(--text-primary)", color: "var(--bg-primary)" }}
             >
               TS
             </div>
@@ -64,7 +65,7 @@ export default function BrowsePage() {
             </div>
           </div>
 
-          <a
+          <Link
             href="/login"
             className="flex items-center gap-1.5 rounded-[10px] px-4 py-2 text-[13px] font-medium transition-all duration-150"
             style={{
@@ -75,7 +76,7 @@ export default function BrowsePage() {
           >
             Sign in
             <ArrowRight size={13} strokeWidth={2.5} />
-          </a>
+          </Link>
         </div>
 
         {/* Search */}

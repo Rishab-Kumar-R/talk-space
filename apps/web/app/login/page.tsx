@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -23,9 +24,9 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-11 h-11 rounded-[14px] flex items-center justify-center"
-               style={{ background: "var(--ai-grad)", boxShadow: "var(--sh-2)" }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: "white", letterSpacing: "-0.04em" }}>TS</span>
+          <div className="w-11 h-11 rounded-[10px] flex items-center justify-center"
+               style={{ background: "var(--text-primary)" }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--bg-primary)", letterSpacing: "-0.03em" }}>TS</span>
           </div>
           <div>
             <h1 className="text-[20px] font-bold leading-tight" style={{ color: "var(--text)", letterSpacing: "-0.02em" }}>
@@ -77,12 +78,12 @@ export default function LoginPage() {
         </p>
 
         <p className="text-center mt-3">
-          <a href="/browse" className="text-[12px] transition-colors"
+          <Link href="/browse" className="text-[12px] transition-colors"
              style={{ color: "var(--text-faint)" }}
              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--accent)"; }}
              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--text-faint)"; }}>
             Browse public rooms without signing in →
-          </a>
+          </Link>
         </p>
       </div>
     </div>
