@@ -141,6 +141,11 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .msg-enter { animation: msgIn 0.18s ease-out both; }
 
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* ── Markdown content ──────────────────────────────────────── */
 .msg-content p { margin: 0 0 0.2rem; }
 .msg-content p:last-child { margin-bottom: 0; }
@@ -314,10 +319,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .n-ws-name:hover { background: var(--hover); }
 .n-ws-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n-ws-avatar {
-  width: 24px; height: 24px; border-radius: 6px;
-  background: var(--ai-grad);
+  width: 24px; height: 24px; border-radius: 5px;
+  background: var(--text-primary);
   display: grid; place-items: center;
-  color: white; font-size: 10px; font-weight: 800; letter-spacing: -0.04em;
+  color: var(--bg-primary); font-size: 10px; font-weight: 800; letter-spacing: -0.03em;
   flex-shrink: 0;
 }
 .n-ws-actions { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
@@ -523,7 +528,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* ── Message group ─────────────────────────────────────────── */
 .msg-group {
-  padding: 4px 56px 4px 56px;
+  padding: 4px 12px 4px 12px;
   display: flex; gap: 12px;
   position: relative;
   transition: background .1s;
@@ -569,9 +574,13 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .msg-group.mentioned:hover {
   background: linear-gradient(to right, rgba(35,131,226,0.12) 0%, var(--hover) 60%);
 }
+@media (min-width: 1024px) {
+  .msg-group { padding-left: 56px; padding-right: 56px; }
+  .msg-actions { right: 56px; }
+}
 .msg-actions {
   position: absolute;
-  top: -14px; right: 56px;
+  top: -14px; right: 12px;
   display: flex; gap: 1px;
   padding: 3px;
   background: var(--panel);
@@ -679,20 +688,31 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 
 /* ── Channel page header (Notion-style) ────────────────────── */
 .channel-header {
-  padding: 48px 56px 20px;
+  padding: 24px 16px 16px;
+}
+@media (min-width: 1024px) {
+  .channel-header {
+    padding: 48px 56px 20px;
+  }
+}
+.channel-header-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 .channel-header-icon {
-  margin-bottom: 12px;
   color: var(--text-faint);
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 .channel-header-title {
-  font-size: 36px; font-weight: 700;
+  font-size: 28px; font-weight: 700;
   color: var(--text);
   letter-spacing: -0.03em;
   line-height: 1.1;
-  margin-bottom: 6px;
+  margin: 0;
 }
 .channel-header-desc {
   font-size: 14px; color: var(--text-muted);
@@ -703,7 +723,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* ── Composer ──────────────────────────────────────────────── */
 .composer-wrap {
   flex-shrink: 0;
-  padding: 6px 56px 24px;
+  padding: 6px 12px 16px;
+}
+@media (min-width: 1024px) {
+  .composer-wrap {
+    padding: 6px 56px 24px;
+  }
 }
 .composer {
   border-radius: var(--r-lg);

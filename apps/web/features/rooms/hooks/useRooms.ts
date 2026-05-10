@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { getRooms, createRoom, markRoomRead, getUnreadCounts } from "../api";
 import { Room } from "../../../shared/types";
 
-export function useRooms() {
+export function useRooms(initialRoomName?: string) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -17,10 +17,11 @@ export function useRooms() {
   useEffect(() => {
     getRooms().then((r) => {
       setRooms(r);
-      if (r.length > 0) setActiveRoom(r[0]);
+      const target = initialRoomName ? r.find((room) => room.name === initialRoomName) : null;
+      setActiveRoom(target ?? (r.length > 0 ? r[0] : null));
     });
     getUnreadCounts().then(setUnreadCounts);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectRoom = useCallback((room: Room) => {
     setActiveRoom(room);
@@ -29,7 +30,7 @@ export function useRooms() {
     markRoomRead(room.name);
   }, []);
 
-  const handleCreateRoom = useCallback(async (e: React.FormEvent) => {
+  const handleCreateRoom = useCallback(async (e: React.FormEvent, onSuccess?: (room: Room) => void) => {
     e.preventDefault();
     if (!newRoomName.trim()) return;
     setCreateError("");
@@ -40,8 +41,9 @@ export function useRooms() {
       setNewRoomPrivate(false);
       setShowCreateRoom(false);
       selectRoom(room);
+      onSuccess?.(room);
     } catch {
-      setCreateError("Room already exists");
+      setCreateError("Room already exists or name is invalid");
     }
   }, [newRoomName, newRoomPrivate, selectRoom]);
 

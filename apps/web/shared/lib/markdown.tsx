@@ -3,6 +3,8 @@
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useMemo } from "react";
+
+const EMOJI_ONLY_RE = /^(\p{Emoji_Presentation}|\p{Emoji}️|‍)+\s*$/u;
 import hljs from "highlight.js";
 
 marked.use({ gfm: true, breaks: true });
@@ -27,7 +29,10 @@ function highlightMentions(text: string, currentUser?: string): string {
 }
 
 export function MarkdownContent({ content, currentUser }: { content: string; currentUser?: string }) {
+  const isEmojiOnly = useMemo(() => EMOJI_ONLY_RE.test(content?.trim() ?? ""), [content]);
+
   const html = useMemo(() => {
+    if (isEmojiOnly) return "";
     const withMentions = highlightMentions(content ?? "", currentUser);
     const raw = marked.parse(withMentions, { renderer }) as string;
     return DOMPurify.sanitize(raw, {
@@ -36,7 +41,15 @@ export function MarkdownContent({ content, currentUser }: { content: string; cur
       FORCE_BODY: false,
       ALLOW_DATA_ATTR: false,
     });
-  }, [content, currentUser]);
+  }, [content, currentUser, isEmojiOnly]);
+
+  if (isEmojiOnly) {
+    return (
+      <div className="msg-content" style={{ fontSize: "2.2em", lineHeight: 1.2 }}>
+        {content?.trim()}
+      </div>
+    );
+  }
 
   return (
     <div
