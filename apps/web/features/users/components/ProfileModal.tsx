@@ -146,7 +146,7 @@ export function ProfileModal({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
               <div>
                 <p style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text)" }}>Read receipts</p>
-                <p style={{ fontSize: 12, color: "var(--text-faint)" }}>Let others see when you've read their messages</p>
+                <p style={{ fontSize: 12, color: "var(--text-faint)" }}>Let others see when you&apos;ve read their messages</p>
               </div>
               <button
                 type="button"

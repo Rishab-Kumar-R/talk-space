@@ -52,6 +52,7 @@ function ScheduledItem({
   const [editing, setEditing] = useState(false);
   const [newValue, setNewValue] = useState(toLocalDatetimeValue(new Date(msg.scheduledFor)));
   const [saving, setSaving] = useState(false);
+  const [minDatetime] = useState(() => toLocalDatetimeValue(new Date(Date.now() + 60_000)));
 
   const isMyMessage = msg.senderUsername === username;
   const roomDisplay = isDM(msg.roomId)
@@ -109,7 +110,7 @@ function ScheduledItem({
           <input
             type="datetime-local"
             value={newValue}
-            min={toLocalDatetimeValue(new Date(Date.now() + 60_000))}
+            min={minDatetime}
             onChange={(e) => setNewValue(e.target.value)}
             style={{
               flex: 1, padding: "6px 8px", borderRadius: 7,
