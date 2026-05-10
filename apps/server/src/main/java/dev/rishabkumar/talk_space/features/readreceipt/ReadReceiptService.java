@@ -19,8 +19,8 @@ public class ReadReceiptService {
     private final UserRepository userRepository;
 
     public ReadReceiptService(ReadReceiptRepository receiptRepository,
-                               MessageRepository messageRepository,
-                               UserRepository userRepository) {
+                              MessageRepository messageRepository,
+                              UserRepository userRepository) {
         this.receiptRepository = receiptRepository;
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
@@ -44,6 +44,14 @@ public class ReadReceiptService {
                             });
                 })
                 .then();
+    }
+
+    /**
+     * Returns IDs of messages in a room that this user has already read.
+     */
+    public Flux<String> getReadMessageIds(String roomId, String username) {
+        return receiptRepository.findByRoomIdAndUsername(roomId, username)
+                .map(ReadReceipt::getMessageId);
     }
 
     public Flux<Map<String, String>> getReceipts(String messageId) {

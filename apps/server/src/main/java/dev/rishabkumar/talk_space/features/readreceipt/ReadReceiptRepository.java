@@ -6,5 +6,8 @@ import reactor.core.publisher.Mono;
 
 public interface ReadReceiptRepository extends ReactiveMongoRepository<ReadReceipt, String> {
     Flux<ReadReceipt> findByMessageId(String messageId);
+
     Mono<Boolean> existsByMessageIdAndUsername(String messageId, String username);
+
+    Flux<ReadReceipt> findByRoomIdAndUsername(String roomId, String username);
 }

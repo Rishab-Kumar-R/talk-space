@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,6 +23,23 @@ public class ReadReceiptController {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getName())
                 .flatMap(username -> readReceiptService.markRead(messageId, username));
+    }
+
+    @GetMapping("/read/mine")
+    public Flux<String> getMyReadIds(@RequestParam String roomId) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMapMany(username -> readReceiptService.getReadMessageIds(roomId, username));
+    }
+
+    @PostMapping("/read/batch")
+    public Mono<Void> markReadBatch(@RequestBody Map<String, List<String>> body) {
+        List<String> ids = body.getOrDefault("messageIds", List.of());
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(username -> Flux.fromIterable(ids)
+                        .flatMap(id -> readReceiptService.markRead(id, username))
+                        .then());
     }
 
     @GetMapping("/{messageId}/receipts")
