@@ -20,7 +20,7 @@ A scalable, real-time chat application with end-to-end message encryption, OAuth
 │                                                             │
 │   REST API              WebSocket Handler     Security      │
 │   /api/auth             /ws/chat/{room}       JWT Filter    │
-│   /api/rooms            JWT via query param   BCrypt        │
+│   /api/rooms            WS ticket auth        OAuth 2.0     │
 │   /api/messages                               AES-256-GCM   │
 │   /api/users                                                │
 └──────────┬──────────────────────┬───────────────────────────┘
@@ -43,11 +43,13 @@ A scalable, real-time chat application with end-to-end message encryption, OAuth
 ```
 
 **Message flow:**
-1. Client sends message over WebSocket
-2. Server validates JWT, encrypts content (AES-256-GCM), saves to MongoDB
-3. Server publishes to Redis channel `chat.room.{roomId}`
-4. All server instances subscribed to that channel push the decrypted message to their connected clients
-5. Recipients receive it in real time — even if on a different server instance
+1. Client calls `POST /api/auth/ws-ticket` to get a short-lived (30 s), single-use opaque ticket
+2. Client opens WebSocket at `/ws/chat/{roomId}?ticket=<ticket>`
+3. Server atomically consumes the ticket from Redis (`GETDEL`) to identify the user — the JWT never appears in the URL or server logs
+4. Server encrypts the message content (AES-256-GCM), saves to MongoDB
+5. Server publishes to Redis channel `chat.room.{roomId}`
+6. All server instances subscribed to that channel push the decrypted message to their connected clients
+7. Recipients receive it in real time — even if on a different server instance
 
 ## Tech Stack
 
@@ -90,7 +92,8 @@ A scalable, real-time chat application with end-to-end message encryption, OAuth
 - **OAuth login** — Google and GitHub ("Continue with…" on the login page)
 - **Refresh token rotation** — 1 h access tokens + 30-day HttpOnly `SameSite=Strict` refresh cookie; silent renewal on 401
 - **Message encryption** — AES-256-GCM at rest
-- **Rate limiting** — per-user Redis sliding window: 30 WS messages/min, 10 room joins/min, 20 uploads/day, 2 private/5 public rooms per month
+- **Rate limiting** — per-user Redis fixed-window counters: 30 WS messages/min, 10 room joins/min, 20 uploads/day, 2 private/5 public rooms per month
+- **WebSocket ticket auth** — JWT never appears in WS URL; a 30 s single-use Redis ticket is issued via REST and consumed atomically on connect
 
 ### Infrastructure & UX
 - **Horizontal scaling** — Redis pub/sub routes messages across any number of server instances
@@ -119,7 +122,7 @@ talk-space/
 │   │       └── shared/
 │   │           ├── config/              # Redis config
 │   │           ├── metrics/             # Micrometer custom metrics
-│   │           ├── ratelimit/           # Redis sliding-window rate limiter
+│   │           ├── ratelimit/           # Redis fixed-window rate limiter
 │   │           └── security/            # JWT, BCrypt, Security filter chain
 │   └── web/                             # Next.js frontend
 │       ├── app/
@@ -248,6 +251,8 @@ This starts MongoDB, Redis, the Spring Boot server, and the Next.js frontend tog
 | `MONGODB_HOST` | No | Defaults to `localhost` |
 | `REDIS_HOST` | No | Defaults to `localhost` |
 | `ALLOWED_ORIGIN` | No | CORS origin, defaults to `http://localhost:3000` |
+| `AUDIT_ADMIN_USERS` | No | Comma-separated usernames that can access `GET /api/audit` (all events) |
+| `CHAT_MAX_MESSAGE_LENGTH` | No | Max message length in characters, defaults to `4000` |
 
 ### Frontend
 
@@ -286,6 +291,7 @@ Images are tagged `latest` and with the short commit SHA:
 | POST | `/api/auth/login` | No | Login, returns JWT |
 | POST | `/api/auth/refresh` | Cookie | Rotate refresh token, returns new JWT |
 | POST | `/api/auth/logout` | Cookie | Revoke refresh token + clear cookie |
+| POST | `/api/auth/ws-ticket` | Yes | Issue a 30 s single-use WebSocket ticket |
 | GET | `/api/rooms` | Yes | List accessible rooms |
 | GET | `/api/rooms/public` | No | List public rooms (for /browse page) |
 | POST | `/api/rooms` | Yes | Create a room |
@@ -309,7 +315,7 @@ Images are tagged `latest` and with the short commit SHA:
 | PATCH | `/api/users/me` | Yes | Update profile |
 | GET | `/api/users/search?q=` | Yes | Search users |
 | POST | `/api/upload` | Yes | Upload a file to S3 |
-| WS | `/ws/chat/{roomId}?token=` | JWT | WebSocket connection |
+| WS | `/ws/chat/{roomId}?ticket=` | WS ticket | WebSocket connection (ticket from `/api/auth/ws-ticket`) |
 
 ## WebSocket Protocol
 

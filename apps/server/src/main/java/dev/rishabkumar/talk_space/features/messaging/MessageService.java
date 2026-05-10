@@ -1,6 +1,10 @@
 package dev.rishabkumar.talk_space.features.messaging;
 
+import dev.rishabkumar.talk_space.features.audit.Audited;
 import dev.rishabkumar.talk_space.shared.security.EncryptionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,6 +19,8 @@ import java.util.Locale;
 
 @Service
 public class MessageService {
+
+    private static final Logger log = LoggerFactory.getLogger(MessageService.class);
 
     private final MessageRepository messageRepository;
     private final EncryptionService encryptionService;
@@ -32,7 +38,7 @@ public class MessageService {
         PageRequest page = PageRequest.of(0, limit);
         Flux<Message> query = before != null
                 ? messageRepository.findByRoomIdAndTimestampBeforeAndDeletedFalseOrderByTimestampDesc(
-                        roomId, Instant.parse(before), page)
+                roomId, Instant.parse(before), page)
                 : messageRepository.findByRoomIdAndDeletedFalseOrderByTimestampDesc(roomId, page);
 
         return query.collectList()
@@ -43,11 +49,14 @@ public class MessageService {
                 .map(this::decrypt);
     }
 
+    @Value("${chat.search.scan-limit:200}")
+    private int searchScanLimit;
+
     public Flux<Message> search(String roomId, String q, int limit) {
         if (q == null || q.isBlank()) return Flux.empty();
         String term = q.toLowerCase(Locale.ROOT);
         return messageRepository.findByRoomIdAndDeletedFalseOrderByTimestampDesc(roomId)
-                .take(500)
+                .take(searchScanLimit)
                 .map(this::decrypt)
                 .filter(msg -> msg.getContent() != null
                         && msg.getContent().toLowerCase(Locale.ROOT).contains(term))
@@ -68,6 +77,7 @@ public class MessageService {
                 .map(this::decrypt);
     }
 
+    @Audited(action = "MESSAGE_EDITED", resourceType = "message", resourceId = "#messageId")
     public Mono<Message> edit(String messageId, String newContent, String callerUsername) {
         return messageRepository.findById(messageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
@@ -80,13 +90,17 @@ public class MessageService {
                     msg.setEditedAt(Instant.now());
                     return messageRepository.save(msg);
                 })
-                .flatMap(saved -> broadcastService.publishMessageEdited(saved, newContent).thenReturn(saved))
+                .flatMap(saved -> {
+                    log.info("Message edited messageId={} by user={}", messageId, callerUsername);
+                    return broadcastService.publishMessageEdited(saved, newContent).thenReturn(saved);
+                })
                 .map(saved -> {
                     saved.setContent(newContent);
                     return saved;
                 });
     }
 
+    @Audited(action = "MESSAGE_DELETED", resourceType = "message", resourceId = "#messageId")
     public Mono<Void> delete(String messageId, String callerUsername) {
         return messageRepository.findById(messageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
@@ -97,7 +111,10 @@ public class MessageService {
                     msg.setContent(null);
                     return messageRepository.save(msg);
                 })
-                .flatMap(saved -> broadcastService.publishMessageDeleted(saved.getId(), saved.getRoomId()))
+                .flatMap(saved -> {
+                    log.info("Message deleted messageId={} by user={}", messageId, callerUsername);
+                    return broadcastService.publishMessageDeleted(saved.getId(), saved.getRoomId());
+                })
                 .then();
     }
 
@@ -112,10 +129,11 @@ public class MessageService {
 
     public Flux<Message> getMentions(String username, int limit) {
         return messageRepository.findByMentionsContainingOrderByTimestampDesc(
-                username, PageRequest.of(0, limit))
+                        username, PageRequest.of(0, limit))
                 .map(this::decrypt);
     }
 
+    @Audited(action = "POLL_VOTED", resourceType = "message", resourceId = "#messageId")
     public Mono<Message> vote(String messageId, int optionIndex, String username) {
         return messageRepository.findById(messageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
@@ -126,18 +144,24 @@ public class MessageService {
                         return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid option"));
                     var votes = msg.getPollVotes();
                     if (Integer.valueOf(optionIndex).equals(votes.get(username))) {
-                        votes.remove(username); // toggle off
+                        votes.remove(username);
                     } else {
                         votes.put(username, optionIndex);
                     }
                     return messageRepository.save(msg);
                 })
-                .flatMap(saved -> broadcastService.publishPollUpdated(saved).thenReturn(saved))
+                .flatMap(saved -> {
+                    log.info("Poll vote recorded messageId={} option={} user={}", messageId, optionIndex, username);
+                    return broadcastService.publishPollUpdated(saved).thenReturn(saved);
+                })
                 .map(this::decrypt);
     }
 
-    /** Save an already-constructed message (used by WebSocket handler). */
+    /**
+     * Save an already-constructed message (used by WebSocket handler).
+     */
     public Mono<Message> save(Message message) {
+        log.debug("Saving message roomId={} type={} sender={}", message.getRoomId(), message.getMessageType(), message.getSenderUsername());
         return messageRepository.save(message);
     }
 

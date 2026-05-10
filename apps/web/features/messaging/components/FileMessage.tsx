@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Download, FileText } from "lucide-react";
 import { Message } from "../../../shared/types";
 import { formatBytes } from "../../../shared/lib/utils";
@@ -6,11 +7,13 @@ export function FileMessage({ msg }: { msg: Message }) {
   if (msg.messageType === "image") {
     return (
       <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" className="block mt-1">
-        <img
-          src={msg.fileUrl}
+        <Image
+          src={msg.fileUrl!}
           alt={msg.fileName ?? "image"}
-          className="max-w-xs max-h-64 rounded-xl object-cover hover:opacity-90 transition-opacity"
-          style={{ border: "1px solid var(--border)" }}
+          width={320}
+          height={240}
+          className="rounded-xl hover:opacity-90 transition-opacity"
+          style={{ objectFit: "cover", width: "auto", height: "auto", maxWidth: 320, maxHeight: 240, border: "1px solid var(--border)" }}
         />
       </a>
     );

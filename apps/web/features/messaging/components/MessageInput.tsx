@@ -329,7 +329,7 @@ export function MessageInput({
               </p>
               <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{replyTo.preview}</p>
             </div>
-            <button onClick={onClearReply} style={{ color: "var(--text-faint)", background: "transparent", border: 0, cursor: "pointer" }}>
+            <button onClick={onClearReply} aria-label="Cancel reply" style={{ color: "var(--text-faint)", background: "transparent", border: 0, cursor: "pointer" }}>
               <X size={14} />
             </button>
           </div>
@@ -346,6 +346,7 @@ export function MessageInput({
                   key={btn.title}
                   type="button"
                   title={btn.title}
+                  aria-label={btn.title}
                   className="icon-btn"
                   onMouseDown={(e) => { e.preventDefault(); handleFormat(btn.prefix, btn.suffix); }}
                 >
@@ -356,6 +357,7 @@ export function MessageInput({
             <button
               type="button"
               title="Code block"
+              aria-label="Code block"
               className="icon-btn"
               onMouseDown={(e) => { e.preventDefault(); handleCodeBlock(); }}
             >
@@ -364,6 +366,7 @@ export function MessageInput({
             <button
               type="button"
               title="Mention"
+              aria-label="Mention someone"
               className="icon-btn"
               onMouseDown={(e) => { e.preventDefault(); handleFormat("@", ""); }}
             >
@@ -373,6 +376,7 @@ export function MessageInput({
               ref={smileBtnRef}
               type="button"
               title="Emoji"
+              aria-label="Insert emoji"
               className="icon-btn"
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -436,13 +440,14 @@ export function MessageInput({
             accept="image/*,.pdf,.txt,.zip,.docx,.xlsx"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileSelect(f); }}
           />
-          <button type="button" title="Attach file" disabled={uploading} className="icon-btn" onClick={() => fileRef.current?.click()}>
+          <button type="button" title="Attach file" aria-label="Attach file" disabled={uploading} className="icon-btn" onClick={() => fileRef.current?.click()}>
             <Paperclip size={15} strokeWidth={1.75} />
           </button>
           {onCreatePoll && (
             <button
               type="button"
               title="Create poll"
+              aria-label="Create poll"
               className="icon-btn"
               onClick={onCreatePoll}
             >
@@ -453,6 +458,7 @@ export function MessageInput({
             <button
               type="button"
               title="Schedule message"
+              aria-label="Schedule message"
               className="icon-btn"
               onClick={() => setShowSchedulePicker((v) => !v)}
               style={showSchedulePicker ? { color: "var(--accent)" } : {}}
@@ -467,6 +473,7 @@ export function MessageInput({
           </span>
           <button
             type="button"
+            aria-label="Send message"
             className="send"
             onClick={(e) => onSend(e as unknown as React.FormEvent)}
             disabled={!canSend}

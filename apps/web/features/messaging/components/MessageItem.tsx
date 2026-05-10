@@ -234,19 +234,20 @@ export function MessageItem({
             ))}
           </div>
         )}
-        <button title="React" onClick={() => setEmojiPickerFor(showEmoji ? null : msg.id)}>
+        <button title="React" aria-label="Add reaction" onClick={() => setEmojiPickerFor(showEmoji ? null : msg.id)}>
           <Smile size={15} />
         </button>
-          <button title="Reply" onClick={() => onReply(display)}>
+          <button title="Reply" aria-label="Reply to message" onClick={() => onReply(display)}>
             <CornerUpLeft size={15} />
           </button>
           {!currentIsDM && (
-            <button title="Reply in thread" onClick={() => onOpenThread(display)}>
+            <button title="Reply in thread" aria-label="Reply in thread" onClick={() => onOpenThread(display)}>
               <MessageSquare size={15} />
             </button>
           )}
           <button
             title={isBookmarked ? "Remove bookmark" : "Save message"}
+            aria-label={isBookmarked ? "Remove bookmark" : "Save message"}
             onClick={() => onBookmark(display)}
             style={isBookmarked ? { color: "var(--accent)" } : {}}
           >
@@ -254,18 +255,17 @@ export function MessageItem({
           </button>
           <span className="sep" />
           {isOwn && display.messageType !== "poll" && (
-            <button title="Edit" onClick={() => onStartEdit(display)}>
+            <button title="Edit" aria-label="Edit message" onClick={() => onStartEdit(display)}>
               <Pencil size={14} />
             </button>
           )}
-          {!currentIsDM && (
-            <button title={isPinned ? "Unpin" : "Pin"} onClick={() => isPinned ? onUnpin(msg.id) : onPin(display)}>
-              {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
-            </button>
-          )}
+          <button title={isPinned ? "Unpin" : "Pin"} aria-label={isPinned ? "Unpin message" : "Pin message"} onClick={() => isPinned ? onUnpin(msg.id) : onPin(display)}>
+            {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+          </button>
           {isOwn && (
             <button
               title="Delete"
+              aria-label="Delete message"
               onClick={() => onDelete(msg.id)}
               style={{ color: "var(--accent-rose)" }}
             >

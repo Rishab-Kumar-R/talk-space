@@ -4,6 +4,7 @@ import dev.rishabkumar.talk_space.features.messaging.BroadcastService;
 import dev.rishabkumar.talk_space.features.messaging.Message;
 import dev.rishabkumar.talk_space.features.messaging.MessageService;
 import dev.rishabkumar.talk_space.shared.security.EncryptionService;
+import dev.rishabkumar.talk_space.shared.util.DmRoomUtils;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -108,7 +109,7 @@ public class ScheduledMessageService {
 
     /**
      * Called by the scheduler job every 30s.
-     *
+     * <p>
      * Uses an atomic findAndModify to claim each due message before dispatching it.
      * If two server instances run simultaneously, only the one that successfully flips
      * sent=false→true gets the document back; the other gets empty and skips — so each
@@ -153,19 +154,12 @@ public class ScheduledMessageService {
                 .flatMap(saved -> {
                     broadcastPayload.put("id", saved.getId());
                     Mono<Void> broadcast = broadcastService.publish(saved.getRoomId(), broadcastPayload).then();
-                    if (saved.getRoomId().startsWith("dm.")) {
-                        String partner = dmPartner(saved.getRoomId(), sm.getSenderUsername());
+                    if (DmRoomUtils.isDm(saved.getRoomId())) {
+                        String partner = DmRoomUtils.partner(saved.getRoomId(), sm.getSenderUsername());
                         broadcast = broadcast.then(broadcastService.publishUnreadBump(saved.getRoomId(), partner).then());
                     }
                     return broadcast;
                 });
-    }
-
-    private static String dmPartner(String roomId, String self) {
-        for (String part : roomId.substring(3).split("\\.")) {
-            if (!part.equals(self)) return part;
-        }
-        return self;
     }
 
     private Map<String, Object> buildBroadcastPayload(Message msg, String plaintext) {

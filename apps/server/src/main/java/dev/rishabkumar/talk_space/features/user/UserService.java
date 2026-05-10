@@ -2,6 +2,8 @@ package dev.rishabkumar.talk_space.features.user;
 
 import dev.rishabkumar.talk_space.features.user.dto.UserProfile;
 import dev.rishabkumar.talk_space.features.user.dto.UserSummary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import java.util.Set;
 
 @Service
 public class UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
 
@@ -39,8 +43,11 @@ public class UserService {
                 .flatMap(user -> {
                     if (updates.containsKey("displayName")) user.setDisplayName((String) updates.get("displayName"));
                     if (updates.containsKey("avatarColor")) user.setAvatarColor((String) updates.get("avatarColor"));
-                    if (updates.containsKey("showReadReceipts"))
-                        user.setShowReadReceipts((Boolean) updates.get("showReadReceipts"));
+                    if (updates.containsKey("showReadReceipts")) {
+                        Object raw = updates.get("showReadReceipts");
+                        if (raw instanceof Boolean b) user.setShowReadReceipts(b);
+                        else if (raw instanceof String s) user.setShowReadReceipts(Boolean.parseBoolean(s));
+                    }
                     if (updates.containsKey("status")) {
                         String s = (String) updates.get("status");
                         if (Set.of("available", "away", "dnd").contains(s)) user.setStatus(s);
@@ -48,6 +55,7 @@ public class UserService {
                     if (updates.containsKey("statusText")) user.setStatusText((String) updates.get("statusText"));
                     return userRepository.save(user);
                 })
+                .doOnSuccess(u -> log.info("Profile updated username={} fields={}", username, updates.keySet()))
                 .map(UserService::toProfile);
     }
 

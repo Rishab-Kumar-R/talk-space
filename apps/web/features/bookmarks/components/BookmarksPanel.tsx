@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { X, Bookmark } from "lucide-react";
+import Image from "next/image";
+import { X, Bookmark, Paperclip } from "lucide-react";
 import { Bookmark as BookmarkType } from "../hooks/useBookmarks";
 import { formatTime } from "../../../shared/lib/utils";
 import { Avatar } from "../../users/components/Avatar";
@@ -36,9 +37,12 @@ function BookmarkItem({ bm, onRemove }: { bm: BookmarkType; onRemove: (id: strin
           <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: "auto" }}>#{bm.roomName}</span>
         </div>
         {bm.messageType === "image" && bm.fileUrl ? (
-          <img src={bm.fileUrl} alt={bm.fileName ?? "image"} style={{ maxHeight: 80, borderRadius: 6, objectFit: "cover" }} />
+          <Image src={bm.fileUrl!} alt={bm.fileName ?? "image"} width={120} height={80} style={{ height: 80, width: "auto", borderRadius: 6, objectFit: "cover" }} />
         ) : bm.messageType === "file" && bm.fileName ? (
-          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>📎 {bm.fileName}</p>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+            <Paperclip size={12} style={{ flexShrink: 0 }} />
+            {bm.fileName}
+          </p>
         ) : (
           <p style={{
             fontSize: 13, color: "var(--text)", lineHeight: 1.5,

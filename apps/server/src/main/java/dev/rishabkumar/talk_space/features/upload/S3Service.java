@@ -31,11 +31,21 @@ public class S3Service {
         this.metrics = metrics;
     }
 
+    private static String extensionFromMime(String mimeType) {
+        return switch (mimeType) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/gif" -> ".gif";
+            case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
+            case "application/zip" -> ".zip";
+            case "text/plain" -> ".txt";
+            default -> "";
+        };
+    }
+
     public Mono<String> upload(String originalFilename, String contentType, byte[] bytes) {
-        String ext = originalFilename.contains(".")
-                ? originalFilename.substring(originalFilename.lastIndexOf('.'))
-                : "";
-        String key = "uploads/" + UUID.randomUUID() + ext;
+        String key = "uploads/" + UUID.randomUUID() + extensionFromMime(contentType);
 
         PutObjectRequest req = PutObjectRequest.builder()
                 .bucket(bucket)

@@ -5,11 +5,16 @@ import dev.rishabkumar.talk_space.features.messaging.Message;
 import dev.rishabkumar.talk_space.features.messaging.MessageService;
 import dev.rishabkumar.talk_space.features.presence.PresenceService;
 import dev.rishabkumar.talk_space.features.room.RoomRepository;
+import dev.rishabkumar.talk_space.features.room.RoomService;
 import dev.rishabkumar.talk_space.shared.metrics.AppMetrics;
 import dev.rishabkumar.talk_space.shared.ratelimit.RateLimitService;
-import dev.rishabkumar.talk_space.shared.security.JwtService;
+import dev.rishabkumar.talk_space.shared.util.DmRoomUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.ReactiveSubscription;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
@@ -33,12 +38,15 @@ import java.util.regex.Pattern;
 @Component
 public class ChatWebSocketHandler implements WebSocketHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
+
     private final ReactiveRedisMessageListenerContainer listenerContainer;
+    private final ReactiveRedisTemplate<String, String> redisTemplate;
     private final RoomRepository roomRepository;
+    private final RoomService roomService;
     private final MessageService messageService;
     private final BroadcastService broadcastService;
     private final PresenceService presenceService;
-    private final JwtService jwtService;
     private final ObjectMapper objectMapper;
     private final AppMetrics metrics;
     private final RateLimitService rateLimitService;
@@ -49,22 +57,27 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     @Value("${rate-limit.ws-joins-per-minute:10}")
     private int wsJoinLimit;
 
+    @Value("${chat.max-message-length:4000}")
+    private int maxMessageLength;
+
     public ChatWebSocketHandler(
             ReactiveRedisMessageListenerContainer listenerContainer,
+            @Qualifier("reactiveStringRedisTemplate") ReactiveRedisTemplate<String, String> redisTemplate,
             RoomRepository roomRepository,
+            RoomService roomService,
             MessageService messageService,
             BroadcastService broadcastService,
             PresenceService presenceService,
-            JwtService jwtService,
             ObjectMapper objectMapper,
             AppMetrics metrics,
             RateLimitService rateLimitService) {
         this.listenerContainer = listenerContainer;
+        this.redisTemplate = redisTemplate;
         this.roomRepository = roomRepository;
+        this.roomService = roomService;
         this.messageService = messageService;
         this.broadcastService = broadcastService;
         this.presenceService = presenceService;
-        this.jwtService = jwtService;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
         this.rateLimitService = rateLimitService;
@@ -74,27 +87,35 @@ public class ChatWebSocketHandler implements WebSocketHandler {
     public Mono<Void> handle(WebSocketSession session) {
         String path = session.getHandshakeInfo().getUri().getPath();
         String roomId = path.substring(path.lastIndexOf('/') + 1);
-        String token = extractToken(session.getHandshakeInfo().getUri().getQuery());
+        String ticket = extractParam(session.getHandshakeInfo().getUri().getQuery(), "ticket");
 
-        if (roomId.isBlank() || token == null || !jwtService.isValid(token)) return session.close();
+        if (roomId.isBlank() || ticket == null) {
+            log.warn("WebSocket rejected — missing ticket or blank roomId");
+            return session.close();
+        }
 
-        String username = jwtService.extractUsername(token);
-
-        // Reject if this user is joining rooms too rapidly
-        return rateLimitService.isAllowed("ratelimit:ws:join:" + username, wsJoinLimit, 60)
-                .flatMap(joinAllowed -> {
-                    if (!joinAllowed) return session.close();
-
-                    // For private rooms, reject non-members immediately
-                    Mono<Boolean> membershipCheck = roomRepository.findByName(roomId)
-                            .map(room -> !room.isPrivate() || room.getMemberRoles().containsKey(username))
-                            .defaultIfEmpty(true);
-
-                    return membershipCheck.flatMap(allowed -> {
-                        if (!allowed) return session.close();
-                        return doHandle(session, roomId, username);
-                    });
-                });
+        // Consume the ticket atomically — getAndDelete ensures single-use
+        return redisTemplate.opsForValue()
+                .getAndDelete("ws:ticket:" + ticket)
+                .switchIfEmpty(Mono.fromRunnable(() ->
+                        log.warn("WebSocket rejected — unknown or expired ticket roomId={}", roomId)))
+                .flatMap(username ->
+                        rateLimitService.isAllowed("ratelimit:ws:join:" + username, wsJoinLimit, 60)
+                                .flatMap(joinAllowed -> {
+                                    if (!joinAllowed) {
+                                        log.warn("WebSocket join rate-limited user={} roomId={}", username, roomId);
+                                        return session.close();
+                                    }
+                                    Mono<Boolean> membershipCheck = roomRepository.findByName(roomId)
+                                            .map(room -> !room.isPrivate() || room.getMemberRoles().containsKey(username))
+                                            .defaultIfEmpty(true);
+                                    return membershipCheck.flatMap(allowed -> {
+                                        if (!allowed) return session.close();
+                                        return doHandle(session, roomId, username);
+                                    });
+                                })
+                )
+                .switchIfEmpty(session.close());
     }
 
     private Mono<Void> doHandle(WebSocketSession session, String roomId, String username) {
@@ -120,9 +141,18 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                             return broadcastService.publish(roomId, Map.copyOf(typingEvent));
                         }
 
+                        String content = (String) event.getOrDefault("content", "");
+                        if (content.length() > maxMessageLength) {
+                            serverPush.tryEmitNext(
+                                    "{\"type\":\"error\",\"message\":\"Message exceeds maximum length of "
+                                            + maxMessageLength + " characters\"}");
+                            return Mono.empty();
+                        }
+
                         return rateLimitService.isAllowed("ratelimit:ws:msg:" + username, wsMsgLimit, 60)
                                 .flatMap(allowed -> {
                                     if (!allowed) {
+                                        log.warn("WebSocket message rate-limited user={} roomId={}", username, roomId);
                                         serverPush.tryEmitNext("{\"type\":\"rate_limited\",\"retryAfter\":60}");
                                         return Mono.empty();
                                     }
@@ -142,10 +172,12 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 Flux.merge(redisMessages, serverPush.asFlux()).map(session::textMessage));
 
         metrics.wsConnections.incrementAndGet();
+        log.info("WebSocket connected user={} roomId={} sessionId={}", username, roomId, session.getId());
         return presenceService.join(roomId, username)
                 .then(Mono.zip(inbound, outbound))
                 .then()
                 .doFinally(signal -> {
+                    log.info("WebSocket disconnected user={} roomId={} signal={}", username, roomId, signal);
                     metrics.wsConnections.decrementAndGet();
                     serverPush.tryEmitComplete();
                     presenceService.leave(roomId, username).subscribe();
@@ -187,7 +219,11 @@ public class ChatWebSocketHandler implements WebSocketHandler {
             message.setPollOptions(pollOptions);
         }
 
-        return messageService.save(message).flatMap(saved -> {
+        Mono<Void> ensureDm = DmRoomUtils.isDm(roomId)
+                ? roomService.ensureDmRoom(roomId, username, DmRoomUtils.partner(roomId, username)).then()
+                : Mono.empty();
+
+        return ensureDm.then(messageService.save(message)).flatMap(saved -> {
             try {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> outEvent = objectMapper.convertValue(saved, Map.class);
@@ -217,9 +253,8 @@ public class ChatWebSocketHandler implements WebSocketHandler {
                 } else {
                     outEvent.put("type", "message");
                     Mono<Void> broadcast = broadcastService.publish(roomId, outEvent).then();
-                    // For DMs, notify the other participant so their badge updates instantly
-                    if (roomId.startsWith("dm.")) {
-                        String partner = dmPartner(roomId, username);
+                    if (DmRoomUtils.isDm(roomId)) {
+                        String partner = DmRoomUtils.partner(roomId, username);
                         broadcast = broadcast.then(broadcastService.publishUnreadBump(roomId, partner).then());
                     }
                     return broadcast;
@@ -230,28 +265,23 @@ public class ChatWebSocketHandler implements WebSocketHandler {
         });
     }
 
-    private static String dmPartner(String roomId, String self) {
-        // roomId format: dm.alice.bob (sorted)
-        for (String part : roomId.substring(3).split("\\.")) {
-            if (!part.equals(self)) return part;
-        }
-        return self;
-    }
-
     private static final Pattern MENTION_PATTERN = Pattern.compile("@([a-zA-Z0-9._-]+)");
+
+    private static final int MAX_MENTIONS = 20;
 
     private List<String> extractMentions(String text) {
         if (text == null || text.isBlank()) return List.of();
         Matcher m = MENTION_PATTERN.matcher(text);
         LinkedHashSet<String> found = new LinkedHashSet<>();
-        while (m.find()) found.add(m.group(1));
+        while (m.find() && found.size() < MAX_MENTIONS) found.add(m.group(1));
         return new ArrayList<>(found);
     }
 
-    private String extractToken(String query) {
+    private String extractParam(String query, String name) {
         if (query == null) return null;
+        String prefix = name + "=";
         for (String param : query.split("&")) {
-            if (param.startsWith("token=")) return param.substring(6);
+            if (param.startsWith(prefix)) return param.substring(prefix.length());
         }
         return null;
     }

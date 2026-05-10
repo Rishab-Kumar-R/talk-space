@@ -3,6 +3,8 @@ package dev.rishabkumar.talk_space.features.auth;
 import dev.rishabkumar.talk_space.features.user.User;
 import dev.rishabkumar.talk_space.features.user.UserRepository;
 import dev.rishabkumar.talk_space.shared.security.JwtService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -22,6 +24,8 @@ import java.time.Duration;
 @Component
 public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(OAuthSuccessHandler.class);
+
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
@@ -30,7 +34,7 @@ public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
     private String frontendUrl;
 
     public OAuthSuccessHandler(UserRepository userRepository, JwtService jwtService,
-                                RefreshTokenService refreshTokenService) {
+                               RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
@@ -42,13 +46,14 @@ public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
         OAuth2User oauthUser = oauthToken.getPrincipal();
         String provider = oauthToken.getAuthorizedClientRegistrationId();
 
-        String providerId  = extractProviderId(oauthUser, provider);
-        String username    = extractUsername(oauthUser, provider);
+        String providerId = extractProviderId(oauthUser, provider);
+        String username = extractUsername(oauthUser, provider);
         String displayName = extractDisplayName(oauthUser, provider);
 
         return userRepository.findByProviderAndProviderId(provider, providerId)
                 .switchIfEmpty(createUser(provider, providerId, username, displayName))
                 .flatMap(user -> {
+                    log.info("OAuth login success provider={} username={}", provider, user.getUsername());
                     String jwt = jwtService.generateToken(user.getUsername());
                     return refreshTokenService.create(user.getUsername())
                             .flatMap(rt -> redirect(exchange.getExchange(), jwt, rt.getToken()));
@@ -78,20 +83,27 @@ public class OAuthSuccessHandler implements ServerAuthenticationSuccessHandler {
     }
 
     private Mono<User> createUser(String provider, String providerId,
-                                   String preferredUsername, String displayName) {
+                                  String preferredUsername, String displayName) {
         User user = new User();
         user.setProvider(provider);
         user.setProviderId(providerId);
         user.setDisplayName(displayName);
 
-        // If preferred username is taken by a different account, append _provider suffix
-        return userRepository.findByUsername(preferredUsername)
-                .flatMap(existing -> {
-                    user.setUsername(preferredUsername + "_" + provider);
-                    return userRepository.save(user);
-                })
+        // Candidate list: preferred → preferred_provider → preferred_providerIdSuffix
+        String suffixed = preferredUsername + "_" + provider;
+        String unique = preferredUsername + "_" + providerId.substring(0, Math.min(6, providerId.length()));
+
+        return tryUsername(user, preferredUsername)
+                .switchIfEmpty(tryUsername(user, suffixed))
+                .switchIfEmpty(tryUsername(user, unique))
+                .doOnSuccess(u -> log.info("New OAuth user created provider={} username={}", provider, u.getUsername()));
+    }
+
+    private Mono<User> tryUsername(User user, String candidate) {
+        return userRepository.findByUsername(candidate)
+                .flatMap(existing -> Mono.<User>empty())
                 .switchIfEmpty(Mono.defer(() -> {
-                    user.setUsername(preferredUsername);
+                    user.setUsername(candidate);
                     return userRepository.save(user);
                 }));
     }

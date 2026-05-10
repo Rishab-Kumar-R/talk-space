@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { Hash, Lock } from "lucide-react";
 import { Room, UserProfile } from "../../../shared/types";
 import { isDM, dmPartner } from "../../../shared/lib/utils";
 import { Avatar } from "../../users/components/Avatar";
@@ -66,7 +67,9 @@ export function RoomSidebar({
                   : "text-warm-700 hover:bg-warm-200 hover:text-warm-900"}
               `}
             >
-              <span className="text-warm-500 text-xs">{room.isPrivate ? "🔒" : "#"}</span>
+              {room.isPrivate
+                ? <Lock size={11} className="text-warm-500 shrink-0" />
+                : <Hash size={11} className="text-warm-500 shrink-0" />}
               <span className="flex-1 truncate">{room.name}</span>
               {unread > 0 && activeRoom?.id !== room.id && (
                 <span className="bg-warm-800 text-warm-50 text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
@@ -94,7 +97,10 @@ export function RoomSidebar({
                   newRoomPrivate ? "bg-warm-400 text-warm-900" : "bg-warm-200 text-warm-600"
                 }`}
               >
-                <span>{newRoomPrivate ? "🔒 Private room" : "# Public room"}</span>
+                <span className="flex items-center gap-1">
+                  {newRoomPrivate ? <Lock size={11} /> : <Hash size={11} />}
+                  {newRoomPrivate ? "Private room" : "Public room"}
+                </span>
                 <span className="text-warm-500">{newRoomPrivate ? "members only" : "anyone can join"}</span>
               </button>
               {createError && <p className="text-red-500 text-xs px-1 mb-1">{createError}</p>}

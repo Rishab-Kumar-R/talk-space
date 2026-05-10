@@ -63,8 +63,10 @@ public class EncryptionService {
             cipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
             return new String(cipher.doFinal(encrypted));
         } catch (Exception e) {
-            log.warn("Decryption failed, returning raw value: {}", e.getMessage());
-            return ciphertext;
+            // GCM authentication failure means the ciphertext was tampered with or the key changed.
+            // Surfacing "[encrypted]" is safer than returning raw ciphertext or crashing the whole response.
+            log.error("Decryption failed — possible key mismatch or data corruption: {}", e.getMessage());
+            return "[encrypted]";
         }
     }
 }

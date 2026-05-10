@@ -18,7 +18,7 @@ export interface Message {
   mentions?: string[];
   threadId?: string;
   threadCount?: number;
-  messageType?: "text" | "image" | "file" | "poll";
+  messageType?: "text" | "image" | "file" | "poll" | "system";
   fileUrl?: string;
   fileName?: string;
   fileSize?: number;

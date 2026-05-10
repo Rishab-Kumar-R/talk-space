@@ -2,14 +2,16 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <!-- Console appender — always active -->
+    <!-- Console appender — traceId shown in yellow for easy local debugging -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}</pattern>
+            <pattern>%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%X{traceId:-}]){yellow} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}</pattern>
         </encoder>
     </appender>
 
-    <!-- Loki appender — active when LOKI_URL is set (i.e. inside Docker) -->
+    <!-- Loki appender — active when LOKI_URL is set (i.e. inside Docker).
+         JsonLayout automatically serialises all MDC fields (traceId, spanId, requestId)
+         into the log body so Grafana can auto-detect traceId and link to Tempo traces. -->
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
             <url>${LOKI_URL:-http://localhost:3100}/loki/api/v1/push</url>
@@ -18,7 +20,8 @@
         </http>
         <format>
             <label>
-                <pattern>app=talkspace-server,host=${HOSTNAME:-local},level=%level,logger=%logger{20}</pattern>
+                <!-- Keep labels low-cardinality; traceId/spanId/requestId live in the JSON body -->
+                <pattern>app=talkspace-server,host=${HOSTNAME:-local},level=%level</pattern>
                 <readMarkers>true</readMarkers>
             </label>
             <message class="com.github.loki4j.logback.JsonLayout"/>
@@ -46,4 +49,5 @@
     <logger name="org.springframework.data.mongodb" level="WARN"/>
     <logger name="org.springframework.data.redis" level="WARN"/>
     <logger name="io.netty" level="WARN"/>
+    <logger name="io.opentelemetry" level="WARN"/>
 </configuration>

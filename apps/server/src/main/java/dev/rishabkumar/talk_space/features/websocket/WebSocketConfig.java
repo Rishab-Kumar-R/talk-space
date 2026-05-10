@@ -7,7 +7,11 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.reactive.HandlerMapping;
 import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.reactive.socket.WebSocketHandler;
+import org.springframework.web.reactive.socket.server.WebSocketService;
+import org.springframework.web.reactive.socket.server.support.HandshakeWebSocketService;
 import org.springframework.web.reactive.socket.server.support.WebSocketHandlerAdapter;
+import org.springframework.web.reactive.socket.server.upgrade.ReactorNettyRequestUpgradeStrategy;
+import reactor.netty.http.server.WebsocketServerSpec;
 
 import java.util.List;
 import java.util.Map;
@@ -33,8 +37,14 @@ public class WebSocketConfig {
         return mapping;
     }
 
+    @Value("${chat.ws.max-frame-payload-length:65536}")
+    private int maxFramePayloadLength;
+
     @Bean
     public WebSocketHandlerAdapter handlerAdapter() {
-        return new WebSocketHandlerAdapter();
+        ReactorNettyRequestUpgradeStrategy upgradeStrategy = new ReactorNettyRequestUpgradeStrategy(
+                () -> WebsocketServerSpec.builder().maxFramePayloadLength(maxFramePayloadLength));
+        WebSocketService wsService = new HandshakeWebSocketService(upgradeStrategy);
+        return new WebSocketHandlerAdapter(wsService);
     }
 }

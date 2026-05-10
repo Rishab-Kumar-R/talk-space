@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getPinnedMessages, pinMessage, unpinMessage } from "../api";
 import { Message, Room } from "../../../shared/types";
-import { isDM } from "../../../shared/lib/utils";
 
 export function usePinning(activeRoom: Room | null) {
   const [showPinned, setShowPinned] = useState(false);
@@ -15,7 +14,7 @@ export function usePinning(activeRoom: Room | null) {
     setShowPinned(false);
     setPinnedMessages([]);
     setPinnedIds([]);
-    if (!activeRoom || isDM(activeRoom.name)) return;
+    if (!activeRoom) return;
     getPinnedMessages(activeRoom.name).then((msgs) => {
       setPinnedMessages(msgs);
       setPinnedIds(msgs.map((m) => m.id));

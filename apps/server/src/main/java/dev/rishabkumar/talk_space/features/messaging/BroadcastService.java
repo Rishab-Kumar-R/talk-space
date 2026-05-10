@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Single place that publishes events to Redis chat channels.
@@ -97,12 +98,47 @@ public class BroadcastService {
         }
     }
 
-    /** Pushes an unread_bump event to a specific user's personal notification channel. */
+    /**
+     * Broadcasts an ephemeral system message (join/leave) — not persisted to MongoDB.
+     */
+    public Mono<Long> publishSystemMessage(String roomId, String text) {
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("type", "message");
+            event.put("id", "sys-" + UUID.randomUUID());
+            event.put("roomId", roomId);
+            event.put("senderUsername", "system");
+            event.put("messageType", "system");
+            event.put("content", text);
+            event.put("timestamp", Instant.now().toString());
+            String json = objectMapper.writeValueAsString(event);
+            return redisTemplate.convertAndSend("chat.room." + roomId, json);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    /**
+     * Pushes an unread_bump event to a specific user's personal notification channel.
+     */
     public Mono<Long> publishUnreadBump(String roomId, String recipientUsername) {
         try {
             String json = objectMapper.writeValueAsString(
                     Map.of("type", "unread_bump", "roomId", roomId));
             return redisTemplate.convertAndSend("notify.user." + recipientUsername, json);
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    /**
+     * Notifies a specific user that they have been removed from a room.
+     */
+    public Mono<Long> publishRoomRemoved(String roomId, String removedUsername) {
+        try {
+            String json = objectMapper.writeValueAsString(
+                    Map.of("type", "room_removed", "roomId", roomId));
+            return redisTemplate.convertAndSend("notify.user." + removedUsername, json);
         } catch (Exception e) {
             return Mono.error(e);
         }

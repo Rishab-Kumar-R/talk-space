@@ -1,7 +1,9 @@
 package dev.rishabkumar.talk_space.features.messaging;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -51,6 +53,8 @@ public class MessageController {
             @PathVariable String messageId,
             @RequestBody Map<String, String> body) {
         String emoji = body.get("emoji");
+        if (emoji == null || emoji.isBlank() || emoji.length() > 12)
+            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid emoji"));
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getName())
                 .flatMap(username -> messageService.toggleReaction(messageId, emoji, username));
@@ -77,7 +81,10 @@ public class MessageController {
     public Mono<Message> vote(
             @PathVariable String messageId,
             @RequestBody Map<String, Object> body) {
-        int optionIndex = ((Number) body.get("optionIndex")).intValue();
+        Object raw = body.get("optionIndex");
+        if (!(raw instanceof Number))
+            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "optionIndex must be a number"));
+        int optionIndex = ((Number) raw).intValue();
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getName())
                 .flatMap(username -> messageService.vote(messageId, optionIndex, username));

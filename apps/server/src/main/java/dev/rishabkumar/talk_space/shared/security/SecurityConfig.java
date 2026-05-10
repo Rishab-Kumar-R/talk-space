@@ -21,11 +21,16 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final JwtService jwtService;
     private final OAuthSuccessHandler oAuthSuccessHandler;
@@ -48,6 +53,7 @@ public class SecurityConfig {
                         .pathMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .pathMatchers("/api/auth/refresh", "/api/auth/logout").permitAll()
                         .pathMatchers("/ws/**").permitAll()
+                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/rooms", "/api/rooms/public", "/api/rooms/*/presence").permitAll()
                         .pathMatchers("/api/messages/*/reactions").authenticated()
                         .pathMatchers("/api/upload").authenticated()
@@ -58,6 +64,9 @@ public class SecurityConfig {
                 .addFilterAt(jwtWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
                 .oauth2Login(oauth -> oauth.authenticationSuccessHandler(oAuthSuccessHandler))
                 .exceptionHandling(e -> e.authenticationEntryPoint((exchange, ex) -> {
+                    log.warn("Auth required: method={} path={}",
+                            exchange.getRequest().getMethod(),
+                            exchange.getRequest().getURI().getPath());
                     exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                     return exchange.getResponse().setComplete();
                 }))
@@ -85,11 +94,18 @@ public class SecurityConfig {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
                 if (jwtService.isValid(token)) {
-                    String username = jwtService.extractUsername(token);
-                    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                            username, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
-                    return chain.filter(exchange)
-                            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                    return jwtService.isBlocklisted(token).flatMap(blocked -> {
+                        if (blocked) {
+                            log.warn("Rejected blocklisted token path={}",
+                                    exchange.getRequest().getURI().getPath());
+                            return chain.filter(exchange);
+                        }
+                        String username = jwtService.extractUsername(token);
+                        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                                username, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                        return chain.filter(exchange)
+                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                    });
                 }
             }
             return chain.filter(exchange);

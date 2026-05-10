@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.time.Instant;
 
 @Service
 public class RateLimitService {
@@ -18,15 +19,21 @@ public class RateLimitService {
     }
 
     /**
-     * Increments the counter for the given key and returns whether the request is within the limit.
-     * The TTL is set on the first increment to enforce a sliding-start window.
+     * Fixed-window rate limiter. The window boundary is aligned to clock time
+     * (e.g. every 60s from epoch), so a burst at the end of one window cannot
+     * be doubled by starting the next window immediately after.
+     * <p>
+     * The key is bucketed by the current time window so each window gets a
+     * fresh counter. TTL is set to 2× the window so Redis cleans up stale keys.
      */
     public Mono<Boolean> isAllowed(String key, int limit, long windowSeconds) {
+        long bucket = Instant.now().getEpochSecond() / windowSeconds;
+        String bucketedKey = key + ":" + bucket;
         return redisTemplate.opsForValue()
-                .increment(key)
+                .increment(bucketedKey)
                 .flatMap(count -> {
                     if (count == 1) {
-                        return redisTemplate.expire(key, Duration.ofSeconds(windowSeconds))
+                        return redisTemplate.expire(bucketedKey, Duration.ofSeconds(windowSeconds * 2))
                                 .thenReturn(true);
                     }
                     return Mono.just(count <= limit);

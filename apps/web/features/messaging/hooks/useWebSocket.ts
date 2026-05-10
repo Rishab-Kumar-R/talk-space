@@ -9,6 +9,22 @@ export type WsEvent =
   | { type: "unread_bump"; roomId: string }
   | { type: "poll_updated"; id: string; pollVotes: Record<string, number> };
 
+const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+async function fetchWsTicket(token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${apiBase}/api/auth/ws-ticket`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const { ticket } = await res.json();
+    return ticket as string;
+  } catch {
+    return null;
+  }
+}
+
 export function useWebSocket(roomId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [wsEvents, setWsEvents] = useState<WsEvent[]>([]);
@@ -34,12 +50,22 @@ export function useWebSocket(roomId: string) {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    function connect() {
+    async function connect() {
       if (genRef.current !== gen) return;
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+      // Fetch a short-lived single-use ticket so the JWT never appears in the WS URL
+      const ticket = await fetchWsTicket(token!);
+      if (genRef.current !== gen) return;
+      if (!ticket) {
+        // Ticket fetch failed (auth error, network blip) — retry with backoff
+        const delay = Math.min(1000 * 2 ** retryCount.current, 30000);
+        retryCount.current += 1;
+        retryTimer.current = setTimeout(connect, delay);
+        return;
+      }
+
       const wsBase = apiBase.replace(/^http/, "ws");
-      const ws = new WebSocket(`${wsBase}/ws/chat/${roomId}?token=${token}`);
+      const ws = new WebSocket(`${wsBase}/ws/chat/${roomId}?ticket=${ticket}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
