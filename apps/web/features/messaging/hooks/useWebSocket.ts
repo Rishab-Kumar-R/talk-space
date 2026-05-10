@@ -7,7 +7,8 @@ export type WsEvent =
   | { type: "thread_count_updated"; rootId: string }
   | { type: "reaction_updated"; id: string; reactions: Record<string, string[]> }
   | { type: "unread_bump"; roomId: string }
-  | { type: "poll_updated"; id: string; pollVotes: Record<string, number> };
+  | { type: "poll_updated"; id: string; pollVotes: Record<string, number> }
+  | { type: "room_removed"; roomId: string };
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -116,7 +117,8 @@ export function useWebSocket(roomId: string) {
         } else if (
           data.type === "message_edited" || data.type === "message_deleted" ||
           data.type === "thread_count_updated" || data.type === "reaction_updated" ||
-          data.type === "unread_bump" || data.type === "poll_updated"
+          data.type === "unread_bump" || data.type === "poll_updated" ||
+          data.type === "room_removed"
         ) {
           setWsEvents((prev) => [...prev, data as WsEvent]);
         }
