@@ -19,6 +19,13 @@ export async function getMyDMs(): Promise<string[]> {
   return (await safeJson<string[]>(res)) ?? [];
 }
 
+export async function ensureDm(partnerUsername: string): Promise<string> {
+  const res = await apiFetch(`${API_BASE}/users/me/dms/${encodeURIComponent(partnerUsername)}`, { method: "POST" });
+  if (!res.ok) throw new Error("Could not open DM");
+  const data = await safeJson<{ roomId: string }>(res);
+  return data!.roomId;
+}
+
 export async function getMe(): Promise<UserProfile | null> {
   const res = await apiFetch(`${API_BASE}/users/me`);
   if (!res.ok) return null;
