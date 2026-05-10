@@ -6,8 +6,13 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+
 @Service
 public class PresenceService {
+
+    private static final Duration TTL = Duration.ofSeconds(90);
+    private static final String GLOBAL_KEY = "presence.global";
 
     private final ReactiveRedisTemplate<String, String> redisTemplate;
 
@@ -16,27 +21,57 @@ public class PresenceService {
         this.redisTemplate = redisTemplate;
     }
 
-    private static final String GLOBAL_KEY = "presence.global";
-
-    public Mono<Long> join(String roomId, String username) {
-        return redisTemplate.opsForSet().add(key(roomId), username)
-                .then(redisTemplate.opsForSet().add(GLOBAL_KEY, username));
+    /**
+     * Mark user online in a room and globally; refreshes TTL.
+     */
+    public Mono<Void> join(String roomId, String username) {
+        String userRoomKey = userRoomKey(roomId, username);
+        String userGlobalKey = userGlobalKey(username);
+        return redisTemplate.opsForValue().set(userRoomKey, "1", TTL)
+                .then(redisTemplate.opsForValue().set(userGlobalKey, "1", TTL))
+                .then();
     }
 
-    public Mono<Long> leave(String roomId, String username) {
-        return redisTemplate.opsForSet().remove(key(roomId), username)
-                .then(redisTemplate.opsForSet().remove(GLOBAL_KEY, username));
+    /**
+     * Remove user from room and global presence immediately.
+     */
+    public Mono<Void> leave(String roomId, String username) {
+        return redisTemplate.delete(userRoomKey(roomId, username))
+                .then(redisTemplate.delete(userGlobalKey(username)))
+                .then();
     }
 
+    /**
+     * Refresh the TTL without changing value (heartbeat).
+     */
+    public Mono<Void> heartbeat(String roomId, String username) {
+        return redisTemplate.expire(userRoomKey(roomId, username), TTL)
+                .then(redisTemplate.expire(userGlobalKey(username), TTL))
+                .then();
+    }
+
+    /**
+     * Returns online usernames for a room by scanning presence keys.
+     */
     public Flux<String> getOnline(String roomId) {
-        return redisTemplate.opsForSet().members(key(roomId));
+        String pattern = "presence.room." + roomId + ".*";
+        return redisTemplate.keys(pattern)
+                .map(key -> key.substring(("presence.room." + roomId + ".").length()));
     }
 
+    /**
+     * Returns all globally online usernames.
+     */
     public Flux<String> getOnlineGlobal() {
-        return redisTemplate.opsForSet().members(GLOBAL_KEY);
+        return redisTemplate.keys("presence.user.*")
+                .map(key -> key.substring("presence.user.".length()));
     }
 
-    private String key(String roomId) {
-        return "presence.room." + roomId;
+    private String userRoomKey(String roomId, String username) {
+        return "presence.room." + roomId + "." + username;
+    }
+
+    private String userGlobalKey(String username) {
+        return "presence.user." + username;
     }
 }

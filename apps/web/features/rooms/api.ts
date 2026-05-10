@@ -35,6 +35,13 @@ export async function getGlobalPresence(): Promise<string[]> {
   return (await safeJson<string[]>(res)) ?? [];
 }
 
+export async function sendPresenceHeartbeat(roomId?: string): Promise<void> {
+  const url = roomId
+    ? `${API_BASE}/rooms/presence/heartbeat?roomId=${encodeURIComponent(roomId)}`
+    : `${API_BASE}/rooms/presence/heartbeat`;
+  await apiFetch(url, { method: "POST" }).catch(() => {});
+}
+
 export async function getRoomMembers(roomId: string): Promise<Record<string, string>> {
   const res = await apiFetch(`${API_BASE}/rooms/${roomId}/members`);
   if (!res.ok) return {};

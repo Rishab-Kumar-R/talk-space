@@ -1,5 +1,6 @@
 package dev.rishabkumar.talk_space.features.room;
 
+import dev.rishabkumar.talk_space.features.messaging.BroadcastService;
 import dev.rishabkumar.talk_space.features.messaging.Message;
 import dev.rishabkumar.talk_space.features.presence.PresenceService;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -16,10 +17,13 @@ public class RoomController {
 
     private final RoomService roomService;
     private final PresenceService presenceService;
+    private final BroadcastService broadcastService;
 
-    public RoomController(RoomService roomService, PresenceService presenceService) {
+    public RoomController(RoomService roomService, PresenceService presenceService,
+                          BroadcastService broadcastService) {
         this.roomService = roomService;
         this.presenceService = presenceService;
+        this.broadcastService = broadcastService;
     }
 
     @GetMapping("/public")
@@ -53,6 +57,16 @@ public class RoomController {
         return presenceService.getOnline(roomId).collectList();
     }
 
+    @PostMapping("/presence/heartbeat")
+    public Mono<Void> heartbeat(@RequestParam(required = false) String roomId) {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(username -> {
+                    String room = roomId != null ? roomId : "__global__";
+                    return presenceService.join(room, username);
+                });
+    }
+
     @GetMapping("/{roomId}/members")
     public Mono<Map<String, String>> getMembers(@PathVariable String roomId) {
         return ReactiveSecurityContextHolder.getContext()
@@ -73,24 +87,35 @@ public class RoomController {
         String targetUsername = body.get("username");
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getName())
-                .flatMap(caller -> roomService.invite(roomId, caller, targetUsername));
+                .flatMap(caller -> roomService.invite(roomId, caller, targetUsername)
+                        .flatMap(room -> broadcastService
+                                .publishSystemMessage(roomId, targetUsername + " joined the room")
+                                .thenReturn(room)));
     }
 
     @DeleteMapping("/{roomId}/members/{username}")
     public Mono<Room> removeMember(@PathVariable String roomId, @PathVariable String username) {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getName())
-                .flatMap(caller -> roomService.removeMember(roomId, caller, username));
+                .flatMap(caller -> roomService.removeMember(roomId, caller, username)
+                        .flatMap(room -> broadcastService
+                                .publishSystemMessage(roomId, username + " left the room")
+                                .then(broadcastService.publishRoomRemoved(roomId, username))
+                                .thenReturn(room)));
     }
 
     @PostMapping("/{roomId}/pin/{messageId}")
     public Mono<Room> pinMessage(@PathVariable String roomId, @PathVariable String messageId) {
-        return roomService.pin(roomId, messageId);
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(caller -> roomService.pin(roomId, caller, messageId));
     }
 
     @DeleteMapping("/{roomId}/pin/{messageId}")
     public Mono<Room> unpinMessage(@PathVariable String roomId, @PathVariable String messageId) {
-        return roomService.unpin(roomId, messageId);
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getName())
+                .flatMap(caller -> roomService.unpin(roomId, caller, messageId));
     }
 
     @GetMapping("/{roomId}/pinned")
